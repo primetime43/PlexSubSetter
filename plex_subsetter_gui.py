@@ -869,6 +869,8 @@ class MainAppFrame(ctk.CTkFrame):
         if var.get():
             if item not in self.selected_items:
                 self.selected_items.append(item)
+            # Show current subtitle status when selected
+            self.show_subtitle_status(item)
         else:
             if item in self.selected_items:
                 self.selected_items.remove(item)
@@ -882,6 +884,10 @@ class MainAppFrame(ctk.CTkFrame):
             try:
                 episodes = show.episodes()
                 if var.get():
+                    # Show summary for the show
+                    self.safe_after(0, lambda: self.log(f"\n📺 {show.title} - Selected all {len(episodes)} episodes"))
+                    self.safe_after(0, lambda: self.log(f"  Tip: Expand seasons and click individual episodes to see their subtitle status"))
+
                     for ep in episodes:
                         if ep not in self.selected_items:
                             self.selected_items.append(ep)
@@ -903,9 +909,17 @@ class MainAppFrame(ctk.CTkFrame):
             try:
                 episodes = season.episodes()
                 if var.get():
+                    # Show status header for the season
+                    season_title = f"{season.parentTitle} - Season {season.seasonNumber}"
+                    self.safe_after(0, lambda: self.log(f"\n📺 {season_title} ({len(episodes)} episodes)"))
+
                     for ep in episodes:
                         if ep not in self.selected_items:
                             self.selected_items.append(ep)
+
+                    # Show subtitle status for all episodes in the season
+                    for ep in episodes:
+                        self.show_subtitle_status(ep)
                 else:
                     for ep in episodes:
                         if ep in self.selected_items:
@@ -957,6 +971,74 @@ class MainAppFrame(ctk.CTkFrame):
         self.list_btn.configure(state=state)
         self.set_btn.configure(state=state)
         self.disable_btn.configure(state=state)
+
+    def show_subtitle_status(self, item):
+        """Show current subtitle status for a video item."""
+        def check_status():
+            if self._is_destroyed:
+                return
+            try:
+                title = self._get_item_title(item)
+
+                # Reload item to get fresh data from Plex server
+                try:
+                    item.reload()
+                except:
+                    pass  # If reload fails, continue with existing data
+
+                has_subs = False
+                selected_sub = None
+                all_subs_info = []
+
+                for media in item.media:
+                    for part in media.parts:
+                        subs = part.subtitleStreams()
+                        if subs:
+                            has_subs = True
+                            for sub in subs:
+                                # Get subtitle info
+                                lang = sub.language if hasattr(sub, 'language') and sub.language else "Unknown"
+                                codec = sub.codec if hasattr(sub, 'codec') and sub.codec else "?"
+                                forced = "[F]" if hasattr(sub, 'forced') and sub.forced else ""
+                                sdh = "[SDH]" if hasattr(sub, 'hearingImpaired') and sub.hearingImpaired else ""
+
+                                # Check if this subtitle is selected
+                                is_selected = False
+                                if hasattr(sub, 'selected'):
+                                    is_selected = bool(sub.selected)
+
+                                status = "[SEL]" if is_selected else "     "
+
+                                # Store info for all subtitles
+                                sub_info = f"{status} {lang} ({codec}) {forced} {sdh}".strip()
+                                all_subs_info.append(sub_info)
+
+                                if is_selected and not selected_sub:
+                                    selected_sub = f"{lang} ({codec}) {forced} {sdh}".strip()
+
+                # Format output message
+                msg = f"📊 {title}"
+                if selected_sub:
+                    msg += f"\n  ✓ Current: {selected_sub}"
+                elif has_subs:
+                    msg += f"\n  ✗ Current: None (no subtitle selected)"
+                else:
+                    msg += f"\n  ✗ Current: None (no subtitles available)"
+
+                # Show all available subtitles
+                if all_subs_info:
+                    msg += "\n  Available subtitles:"
+                    for sub_info in all_subs_info:
+                        msg += f"\n    {sub_info}"
+
+                self.safe_after(0, lambda m=msg: self.log(m))
+
+            except Exception as e:
+                title = self._get_item_title(item)
+                self.safe_after(0, lambda err=str(e): self.log(f"📊 {title}\n  Error: {err}"))
+
+        # Run in thread to avoid blocking UI
+        threading.Thread(target=check_status, daemon=True).start()
 
     def get_video_items(self):
         """Get selected video items."""
