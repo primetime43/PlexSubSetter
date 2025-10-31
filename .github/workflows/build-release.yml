@@ -25,7 +25,7 @@ jobs:
 
     - name: Build Windows executable
       run: |
-        pyinstaller --onefile --windowed --name PlexSubSetter --clean plex_subsetter_gui.py
+        pyinstaller PlexSubSetter.spec --clean
       shell: cmd
 
     - name: Upload Windows executable to release
@@ -67,7 +67,7 @@ jobs:
 
     - name: Build macOS executable
       run: |
-        pyinstaller --onefile --windowed --name PlexSubSetter --clean plex_subsetter_gui.py
+        pyinstaller PlexSubSetter.spec --clean
 
     - name: Create macOS DMG (optional - creates .app bundle)
       run: |
@@ -135,7 +135,7 @@ jobs:
 
     - name: Build Linux executable
       run: |
-        pyinstaller --onefile --windowed --name PlexSubSetter --clean plex_subsetter_gui.py
+        pyinstaller PlexSubSetter.spec --clean
 
     - name: Make executable
       run: chmod +x dist/PlexSubSetter
