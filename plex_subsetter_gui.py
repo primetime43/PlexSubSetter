@@ -373,10 +373,11 @@ class MainAppFrame(ctk.CTkFrame):
         """Create main application widgets."""
 
         # === LEFT PANEL: BROWSER ===
-        browser_panel = ctk.CTkFrame(self)
+        browser_panel = ctk.CTkFrame(self, width=400)
         browser_panel.grid(row=0, column=0, sticky="nsew", padx=(20, 10), pady=20)
         browser_panel.grid_columnconfigure(0, weight=1)
         browser_panel.grid_rowconfigure(5, weight=1)  # Browser scroll can expand
+        browser_panel.grid_propagate(False)  # Prevent content from resizing the panel
 
         # Browser header
         ctk.CTkLabel(browser_panel, text="📚 Library Browser",
@@ -926,6 +927,12 @@ class MainAppFrame(ctk.CTkFrame):
 
         threading.Thread(target=load_thread, daemon=True).start()
 
+    def truncate_title(self, title, max_length=80):
+        """Truncate title if too long."""
+        if len(title) > max_length:
+            return title[:max_length-3] + "..."
+        return title
+
     def populate_movies(self, movies):
         """Populate browser with movies with page navigation."""
         # Clear any loading indicator
@@ -984,7 +991,8 @@ class MainAppFrame(ctk.CTkFrame):
                                            text_color="gray", font=ctk.CTkFont(size=14, weight="bold"))
                 status_label.pack(side="left", padx=(0, 5))
 
-                cb = ctk.CTkCheckBox(frame, text=f"{movie.title} ({movie.year})",
+                title_text = self.truncate_title(f"{movie.title} ({movie.year})")
+                cb = ctk.CTkCheckBox(frame, text=title_text,
                                     variable=var,
                                     command=lambda m=movie, v=var: self.on_item_selected(m, v))
                 cb.pack(side="left", fill="x", expand=True)
@@ -1116,7 +1124,8 @@ class MainAppFrame(ctk.CTkFrame):
                                            command=lambda s=show, f=show_frame, v=expand_var: self.toggle_show(s, f, v))
                 expand_btn.pack(side="left", padx=(0, 5))
 
-                show_cb = ctk.CTkCheckBox(show_inner, text=f"{show.title}",
+                title_text = self.truncate_title(show.title)
+                show_cb = ctk.CTkCheckBox(show_inner, text=title_text,
                                          variable=show_var,
                                          command=lambda s=show, v=show_var, f=show_frame: self.on_show_selected(s, v, f))
                 show_cb.pack(side="left", fill="x", expand=True)
@@ -1329,8 +1338,9 @@ class MainAppFrame(ctk.CTkFrame):
                                            text_color="gray", font=ctk.CTkFont(size=12, weight="bold"))
                 status_label.pack(side="left", padx=(5, 5))
 
+                ep_title_text = self.truncate_title(f"E{episode.index:02d} - {episode.title}", max_length=70)
                 ep_cb = ctk.CTkCheckBox(ep_frame,
-                                       text=f"E{episode.index:02d} - {episode.title}",
+                                       text=ep_title_text,
                                        variable=episode_var,
                                        command=lambda e=episode, v=episode_var: self.on_item_selected(e, v))
                 ep_cb.pack(side="left", anchor="w", fill="x", expand=True)
