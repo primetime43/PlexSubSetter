@@ -317,6 +317,9 @@ class MainAppFrame(ctk.CTkFrame):
         self.search_text.trace_add("write", lambda *args: self.filter_items())
         self.search_results = {}  # Store search results: {item: [subtitles]}
         self.subtitle_status_cache = {}  # Cache subtitle status: {item_id: has_subs}
+        self.subtitle_status_filter = "all"  # Filter: "all", "missing", "has"
+        self.all_movies = None  # Store all movies for filtering
+        self.all_shows = None  # Store all shows for filtering
 
         # Load settings
         self.load_settings()
@@ -360,7 +363,9 @@ class MainAppFrame(ctk.CTkFrame):
         """Safely schedule a function call, checking if widget is destroyed."""
         if not self._is_destroyed:
             try:
-                self.after(ms, func)
+                # Check if the widget still exists before scheduling
+                if self.winfo_exists():
+                    self.after(ms, func)
             except:
                 pass
 
@@ -371,7 +376,7 @@ class MainAppFrame(ctk.CTkFrame):
         browser_panel = ctk.CTkFrame(self)
         browser_panel.grid(row=0, column=0, sticky="nsew", padx=(20, 10), pady=20)
         browser_panel.grid_columnconfigure(0, weight=1)
-        browser_panel.grid_rowconfigure(3, weight=1)  # Updated for search bar
+        browser_panel.grid_rowconfigure(5, weight=1)  # Browser scroll can expand
 
         # Browser header
         ctk.CTkLabel(browser_panel, text="📚 Library Browser",
@@ -391,9 +396,9 @@ class MainAppFrame(ctk.CTkFrame):
                                                 command=self.load_library_content, height=28)
         self.refresh_browser_btn.grid(row=1, column=0, sticky="ew")
 
-        # Search/Filter bar
+        # Search/Filter bar (always visible)
         search_frame = ctk.CTkFrame(browser_panel, fg_color="transparent")
-        search_frame.grid(row=2, column=0, padx=15, pady=(5, 0), sticky="ew")
+        search_frame.grid(row=2, column=0, padx=15, pady=(5, 5), sticky="ew")
         search_frame.grid_columnconfigure(0, weight=1)
 
         self.search_entry = ctk.CTkEntry(search_frame, placeholder_text="🔍 Search/filter items...",
@@ -405,19 +410,55 @@ class MainAppFrame(ctk.CTkFrame):
                                         fg_color="transparent", hover_color="#404040")
         clear_search_btn.grid(row=0, column=1)
 
+        # Subtitle status filter buttons (for movies only)
+        self.filter_btn_frame = ctk.CTkFrame(browser_panel, fg_color="transparent")
+        self.filter_btn_frame.grid(row=3, column=0, padx=15, pady=(0, 5), sticky="ew")
+        self.filter_btn_frame.grid_columnconfigure(0, weight=1)
+        self.filter_btn_frame.grid_columnconfigure(1, weight=1)
+        self.filter_btn_frame.grid_columnconfigure(2, weight=1)
+
+        ctk.CTkLabel(self.filter_btn_frame, text="Show:", font=ctk.CTkFont(size=11, weight="bold"),
+                    text_color="gray").grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 3))
+
+        self.filter_all_btn = ctk.CTkButton(self.filter_btn_frame, text="All",
+                                           command=lambda: self.set_subtitle_filter("all"),
+                                           height=24, fg_color="#1f538d", hover_color="#1a4472")
+        self.filter_all_btn.grid(row=1, column=0, padx=(0, 3), sticky="ew")
+
+        self.filter_missing_btn = ctk.CTkButton(self.filter_btn_frame, text="Missing",
+                                               command=lambda: self.set_subtitle_filter("missing"),
+                                               height=24, fg_color="transparent", border_width=1,
+                                               border_color="gray50")
+        self.filter_missing_btn.grid(row=1, column=1, padx=(0, 3), sticky="ew")
+
+        self.filter_has_btn = ctk.CTkButton(self.filter_btn_frame, text="Has Subs",
+                                           command=lambda: self.set_subtitle_filter("has"),
+                                           height=24, fg_color="transparent", border_width=1,
+                                           border_color="gray50")
+        self.filter_has_btn.grid(row=1, column=2, sticky="ew")
+
+        # Hide filter buttons by default (will show for movies only)
+        self.filter_btn_frame.grid_remove()
+
         # Filter status label (shows filter results count)
         self.filter_status_label = ctk.CTkLabel(browser_panel, text="",
                                                font=ctk.CTkFont(size=10), text_color="gray")
-        self.filter_status_label.grid(row=2, column=0, padx=15, pady=(35, 0), sticky="w")
+        self.filter_status_label.grid(row=4, column=0, padx=15, pady=(0, 5), sticky="w")
 
         # Browser scrollable frame
         self.browser_scroll = ctk.CTkScrollableFrame(browser_panel, label_text="Select Items")
-        self.browser_scroll.grid(row=3, column=0, padx=15, pady=(10, 10), sticky="nsew")
+        self.browser_scroll.grid(row=5, column=0, padx=15, pady=(5, 5), sticky="nsew")
         self.browser_scroll.grid_columnconfigure(0, weight=1)
+
+        # Pagination controls (fixed position, outside scroll area)
+        self.pagination_frame = ctk.CTkFrame(browser_panel, fg_color="transparent", height=40)
+        self.pagination_frame.grid(row=6, column=0, padx=15, pady=(0, 5), sticky="ew")
+        self.pagination_frame.grid_columnconfigure(1, weight=1)
+        self.pagination_frame.grid_remove()  # Hidden by default
 
         # Selection info and controls
         select_control_frame = ctk.CTkFrame(browser_panel, fg_color="transparent")
-        select_control_frame.grid(row=4, column=0, padx=15, pady=(0, 15), sticky="ew")
+        select_control_frame.grid(row=7, column=0, padx=15, pady=(0, 15), sticky="ew")
         select_control_frame.grid_columnconfigure(0, weight=1)
 
         self.selection_label = ctk.CTkLabel(select_control_frame, text="0 items selected",
@@ -700,41 +741,68 @@ class MainAppFrame(ctk.CTkFrame):
         self.search_text.set("")
         self.filter_status_label.configure(text="")
 
-    def filter_items(self):
-        """Filter displayed items based on search text (top-level only: show/movie names)."""
-        search_query = self.search_text.get().lower().strip()
+    def set_subtitle_filter(self, filter_type):
+        """Set the subtitle status filter (all, missing, has)."""
+        self.subtitle_status_filter = filter_type
 
-        if not search_query:
-            # No filter - show all items
-            for frame in self.top_level_frames:
-                try:
-                    frame.pack(fill="x", pady=2, padx=5)
-                except:
-                    pass
-            self.filter_status_label.configure(text="")
+        # Update button appearances to show active filter
+        if filter_type == "all":
+            self.filter_all_btn.configure(fg_color="#1f538d", border_width=0)
+            self.filter_missing_btn.configure(fg_color="transparent", border_width=1)
+            self.filter_has_btn.configure(fg_color="transparent", border_width=1)
+        elif filter_type == "missing":
+            self.filter_all_btn.configure(fg_color="transparent", border_width=1)
+            self.filter_missing_btn.configure(fg_color="#8b0000", border_width=0)
+            self.filter_has_btn.configure(fg_color="transparent", border_width=1)
+        elif filter_type == "has":
+            self.filter_all_btn.configure(fg_color="transparent", border_width=1)
+            self.filter_missing_btn.configure(fg_color="transparent", border_width=1)
+            self.filter_has_btn.configure(fg_color="#2d7a2d", border_width=0)
+
+        # Reapply filter
+        self.filter_items()
+
+    def filter_items(self):
+        """Filter items based on search text and subtitle status."""
+        # If we have movies or shows loaded, reload the page to apply search filter
+        if hasattr(self, 'all_movies') and self.all_movies is not None:
+            # Reload page 1 with new search filter
+            if hasattr(self, 'load_movie_page'):
+                self.load_movie_page(1)
+        elif hasattr(self, 'all_shows') and self.all_shows is not None:
+            # Reload page 1 with new search filter
+            if hasattr(self, 'load_show_page'):
+                self.load_show_page(1)
+
+        # Apply subtitle status filter to currently displayed items (for movies only)
+        if self.subtitle_status_filter != "all":
+            self.apply_subtitle_status_filter()
+
+    def apply_subtitle_status_filter(self):
+        """Apply subtitle status filter to currently displayed movie items."""
+        subtitle_filter = self.subtitle_status_filter
+
+        # Only apply subtitle filter to movies (not shows)
+        if not hasattr(self, 'all_movies') or self.all_movies is None:
             return
 
-        # Filter items - only check top-level names (shows/movies)
         visible_count = 0
         total_count = len(self.top_level_frames)
 
         for frame in self.top_level_frames:
             match_found = False
 
-            # Check if it's a show frame (has show_obj attribute)
-            if hasattr(frame, 'show_obj'):
-                # For shows, only check the show title (no deep search)
-                show = frame.show_obj
-                if search_query in show.title.lower():
+            # Only filter movies (frames with item_obj but not show_obj)
+            if hasattr(frame, 'item_obj') and not hasattr(frame, 'show_obj'):
+                if subtitle_filter == "all":
                     match_found = True
-            else:
-                # For movies, check the checkbox text
-                for child in frame.winfo_children():
-                    if isinstance(child, ctk.CTkCheckBox):
-                        checkbox_text = child.cget("text").lower()
-                        if search_query in checkbox_text:
-                            match_found = True
-                            break
+                else:
+                    item_obj = frame.item_obj
+                    has_subs = self.check_has_subtitles(item_obj)
+                    if subtitle_filter == "missing" and not has_subs:
+                        match_found = True
+                    elif subtitle_filter == "has" and has_subs:
+                        match_found = True
 
             # Show or hide based on match
             if match_found:
@@ -750,13 +818,73 @@ class MainAppFrame(ctk.CTkFrame):
                     pass
 
         # Update filter status
-        if visible_count == total_count:
-            self.filter_status_label.configure(text="")
-        else:
+        search_query = self.search_text.get().lower().strip()
+        filter_text = ""
+        if search_query:
+            filter_text = f"Search: '{search_query}'"
+        if subtitle_filter != "all":
+            if filter_text:
+                filter_text += " | "
+            filter_text += f"Status: {subtitle_filter}"
+
+        if visible_count != total_count or filter_text:
             self.filter_status_label.configure(
-                text=f"Showing {visible_count} of {total_count} items",
+                text=f"Showing {visible_count} of {total_count} items" + (f" ({filter_text})" if filter_text else ""),
                 text_color="#e5a00d"
             )
+        else:
+            self.filter_status_label.configure(text="")
+
+    def _show_has_loaded_episodes_matching_filter(self, show_frame, looking_for_has_subs):
+        """Check if a show has any LOADED episodes matching the subtitle filter.
+
+        This only checks episodes that have already been loaded into the UI,
+        preventing the need to load all episodes just for filtering.
+        """
+        # Recursively search through the show frame for episode items
+        def search_episodes(widget):
+            # Check if this widget has an item_obj
+            if hasattr(widget, 'item_obj'):
+                item = widget.item_obj
+                if isinstance(item, Episode):
+                    has_subs = self.check_has_subtitles(item)
+                    if has_subs == looking_for_has_subs:
+                        return True
+
+            # Search children
+            try:
+                for child in widget.winfo_children():
+                    if search_episodes(child):
+                        return True
+            except:
+                pass
+
+            return False
+
+        # If no loaded episodes found matching filter, but show is expanded,
+        # check if there are ANY loaded episodes at all
+        result = search_episodes(show_frame)
+
+        # If we found no matches but the show is expanded, only show if there are NO episodes loaded yet
+        # (meaning seasons haven't been expanded, so we don't know)
+        if not result:
+            # Check if any episodes are actually loaded
+            def has_any_episodes(widget):
+                if hasattr(widget, 'item_obj') and isinstance(widget.item_obj, Episode):
+                    return True
+                try:
+                    for child in widget.winfo_children():
+                        if has_any_episodes(child):
+                            return True
+                except:
+                    pass
+                return False
+
+            # If no episodes loaded yet, show the item (we don't know)
+            if not has_any_episodes(show_frame):
+                return True
+
+        return result
 
     def load_library_content(self):
         """Load content from selected library into browser."""
@@ -799,7 +927,7 @@ class MainAppFrame(ctk.CTkFrame):
         threading.Thread(target=load_thread, daemon=True).start()
 
     def populate_movies(self, movies):
-        """Populate browser with movies."""
+        """Populate browser with movies with page navigation."""
         # Clear any loading indicator
         for widget in self.browser_scroll.winfo_children():
             widget.destroy()
@@ -807,58 +935,128 @@ class MainAppFrame(ctk.CTkFrame):
         # Clear top-level frames list
         self.top_level_frames.clear()
 
-        movie_frames = []  # Collect frames for background status loading
+        # Show filter buttons for movies
+        self.filter_btn_frame.grid()
+        # Reset filter to "all"
+        self.set_subtitle_filter("all")
 
-        for movie in movies:
-            var = ctk.BooleanVar()
-            frame = ctk.CTkFrame(self.browser_scroll, fg_color="transparent")
-            frame.pack(fill="x", pady=2, padx=5)
+        # Store all movies (unfiltered) and clear shows
+        self.all_movies = movies
+        self.all_shows = None
+        self.movies_per_page = 30
+        self.current_movie_page = 1
 
-            # Add subtitle status indicator with placeholder (load status in background)
-            status_label = ctk.CTkLabel(frame, text="○", width=20,
-                                       text_color="gray", font=ctk.CTkFont(size=14, weight="bold"))
-            status_label.pack(side="left", padx=(0, 5))
+        # Define the page loading function
+        def load_movie_page(page_num):
+            """Load a specific page of filtered movies."""
+            # Apply search and filter to get filtered list
+            search_query = self.search_text.get().lower().strip()
+            filtered_movies = [m for m in self.all_movies
+                             if not search_query or search_query in m.title.lower()]
 
-            cb = ctk.CTkCheckBox(frame, text=f"{movie.title} ({movie.year})",
-                                variable=var,
-                                command=lambda m=movie, v=var: self.on_item_selected(m, v))
-            cb.pack(side="left", fill="x", expand=True)
+            # Apply subtitle status filter (we'll filter after loading for performance)
+            total_movies = len(filtered_movies)
+            total_pages = max(1, (total_movies + self.movies_per_page - 1) // self.movies_per_page)
 
-            # Store references for updating status
-            frame.status_label = status_label
-            frame.item_obj = movie
-
-            # Store frame for filtering
-            self.top_level_frames.append(frame)
-
-            # Add to list for background loading
-            movie_frames.append(frame)
-
-        # Trigger filter to ensure items are visible
-        self.filter_items()
-
-        # Load subtitle status in background thread to avoid blocking UI
-        def load_subtitle_status():
-            if self._is_destroyed:
+            if self._is_destroyed or page_num < 1 or page_num > total_pages:
                 return
-            for frame in movie_frames:
-                if self._is_destroyed:
-                    return
-                try:
-                    item = frame.item_obj
-                    has_subs = self.check_has_subtitles(item)
-                    status_icon = "✓" if has_subs else "✗"
-                    status_color = "#2d7a2d" if has_subs else "#8b0000"
-                    # Update UI on main thread
-                    self.safe_after(0, lambda f=frame, i=status_icon, c=status_color:
-                                   f.status_label.configure(text=i, text_color=c))
-                except:
-                    pass
 
-        threading.Thread(target=load_subtitle_status, daemon=True).start()
+            # Clear current items
+            for widget in self.browser_scroll.winfo_children():
+                widget.destroy()
+            self.top_level_frames.clear()
+
+            self.current_movie_page = page_num
+
+            # Calculate range
+            start_idx = (page_num - 1) * self.movies_per_page
+            end_idx = min(start_idx + self.movies_per_page, total_movies)
+
+            # Create movie widgets for this page
+            page_frames = []
+            for i in range(start_idx, end_idx):
+                movie = filtered_movies[i]
+                var = ctk.BooleanVar()
+                frame = ctk.CTkFrame(self.browser_scroll, fg_color="transparent")
+                frame.pack(fill="x", pady=2, padx=5)
+
+                status_label = ctk.CTkLabel(frame, text="○", width=20,
+                                           text_color="gray", font=ctk.CTkFont(size=14, weight="bold"))
+                status_label.pack(side="left", padx=(0, 5))
+
+                cb = ctk.CTkCheckBox(frame, text=f"{movie.title} ({movie.year})",
+                                    variable=var,
+                                    command=lambda m=movie, v=var: self.on_item_selected(m, v))
+                cb.pack(side="left", fill="x", expand=True)
+
+                frame.status_label = status_label
+                frame.item_obj = movie
+                self.top_level_frames.append(frame)
+                page_frames.append(frame)
+
+            # Update external pagination controls
+            for widget in self.pagination_frame.winfo_children():
+                widget.destroy()
+
+            prev_btn = ctk.CTkButton(self.pagination_frame, text="◀ Previous",
+                                     width=100, height=32,
+                                     command=lambda: load_movie_page(page_num - 1),
+                                     state="normal" if page_num > 1 else "disabled")
+            prev_btn.grid(row=0, column=0, padx=5)
+
+            page_label = ctk.CTkLabel(self.pagination_frame,
+                                     text=f"Page {page_num} of {total_pages}",
+                                     font=ctk.CTkFont(size=12))
+            page_label.grid(row=0, column=1, padx=5)
+
+            next_btn = ctk.CTkButton(self.pagination_frame, text="Next ▶",
+                                     width=100, height=32,
+                                     command=lambda: load_movie_page(page_num + 1),
+                                     state="normal" if page_num < total_pages else "disabled")
+            next_btn.grid(row=0, column=2, padx=5)
+
+            # Show pagination frame
+            self.pagination_frame.grid()
+
+            # Update status
+            self.update_status(f"Page {page_num}/{total_pages} ({start_idx + 1}-{end_idx} of {total_movies} movies)")
+
+            # Load subtitle status in background
+            def start_subtitle_status_loading():
+                def load_subtitle_status():
+                    if self._is_destroyed:
+                        return
+                    for frame in page_frames:
+                        if self._is_destroyed:
+                            return
+                        try:
+                            item = frame.item_obj
+                            has_subs = self.check_has_subtitles(item)
+                            status_icon = "✓" if has_subs else "✗"
+                            status_color = "#2d7a2d" if has_subs else "#8b0000"
+                            self.safe_after(0, lambda f=frame, i=status_icon, c=status_color:
+                                           f.status_label.configure(text=i, text_color=c))
+                        except:
+                            pass
+                    # Apply subtitle status filter after loading all statuses
+                    if not self._is_destroyed:
+                        self.safe_after(0, lambda: self.apply_subtitle_status_filter())
+                threading.Thread(target=load_subtitle_status, daemon=True).start()
+
+            self.after(50, start_subtitle_status_loading)
+
+        # Store the load function so it can be called when filters change
+        self.load_movie_page = load_movie_page
+
+        # Load first page
+        if movies:
+            load_movie_page(1)
+        else:
+            self.pagination_frame.grid_remove()
+            self.update_status("No movies found")
 
     def populate_shows(self, shows):
-        """Populate browser with shows (expandable)."""
+        """Populate browser with shows (expandable) with page navigation."""
         # Clear any loading indicator
         for widget in self.browser_scroll.winfo_children():
             widget.destroy()
@@ -866,41 +1064,107 @@ class MainAppFrame(ctk.CTkFrame):
         # Clear top-level frames list
         self.top_level_frames.clear()
 
-        for show in shows:
-            # Show frame
-            show_frame = ctk.CTkFrame(self.browser_scroll, fg_color="transparent")
-            show_frame.pack(fill="x", pady=2, padx=5)
+        # Hide filter buttons for TV shows
+        self.filter_btn_frame.grid_remove()
+        # Reset filter to "all"
+        self.subtitle_status_filter = "all"
 
-            # Show checkbox and expand button
-            show_inner = ctk.CTkFrame(show_frame, fg_color="transparent")
-            show_inner.pack(fill="x")
+        # Store all shows (unfiltered) and clear movies
+        self.all_shows = shows
+        self.all_movies = None
+        self.shows_per_page = 25
+        self.current_show_page = 1
 
-            show_var = ctk.BooleanVar()
-            expand_var = ctk.BooleanVar(value=False)
+        def load_show_page(page_num):
+            """Load a specific page of filtered shows."""
+            # Apply search filter to get filtered list
+            search_query = self.search_text.get().lower().strip()
+            filtered_shows = [s for s in self.all_shows
+                            if not search_query or search_query in s.title.lower()]
 
-            expand_btn = ctk.CTkButton(show_inner, text="▶", width=30, height=24,
-                                       fg_color="transparent",
-                                       command=lambda s=show, f=show_frame, v=expand_var: self.toggle_show(s, f, v))
-            expand_btn.pack(side="left", padx=(0, 5))
+            total_shows = len(filtered_shows)
+            total_pages = max(1, (total_shows + self.shows_per_page - 1) // self.shows_per_page)
 
-            show_cb = ctk.CTkCheckBox(show_inner, text=f"{show.title}",
-                                     variable=show_var,
-                                     command=lambda s=show, v=show_var, f=show_frame: self.on_show_selected(s, v, f))
-            show_cb.pack(side="left", fill="x", expand=True)
+            if self._is_destroyed or page_num < 1 or page_num > total_pages:
+                return
 
-            # Store references
-            show_frame.expand_btn = expand_btn
-            show_frame.expand_var = expand_var
-            show_frame.show_var = show_var
-            show_frame.show_obj = show
-            show_frame.show_cb = show_cb  # Store checkbox reference
-            show_frame.season_frames = []  # Store season frames for disabling
+            # Clear current items
+            for widget in self.browser_scroll.winfo_children():
+                widget.destroy()
+            self.top_level_frames.clear()
 
-            # Store frame for filtering
-            self.top_level_frames.append(show_frame)
+            self.current_show_page = page_num
 
-        # Trigger filter to ensure items are visible
-        self.filter_items()
+            # Calculate range
+            start_idx = (page_num - 1) * self.shows_per_page
+            end_idx = min(start_idx + self.shows_per_page, total_shows)
+
+            # Create show widgets for this page
+            for i in range(start_idx, end_idx):
+                show = filtered_shows[i]
+                show_frame = ctk.CTkFrame(self.browser_scroll, fg_color="transparent")
+                show_frame.pack(fill="x", pady=2, padx=5)
+
+                show_inner = ctk.CTkFrame(show_frame, fg_color="transparent")
+                show_inner.pack(fill="x")
+
+                show_var = ctk.BooleanVar()
+                expand_var = ctk.BooleanVar(value=False)
+
+                expand_btn = ctk.CTkButton(show_inner, text="▶", width=30, height=24,
+                                           fg_color="transparent",
+                                           command=lambda s=show, f=show_frame, v=expand_var: self.toggle_show(s, f, v))
+                expand_btn.pack(side="left", padx=(0, 5))
+
+                show_cb = ctk.CTkCheckBox(show_inner, text=f"{show.title}",
+                                         variable=show_var,
+                                         command=lambda s=show, v=show_var, f=show_frame: self.on_show_selected(s, v, f))
+                show_cb.pack(side="left", fill="x", expand=True)
+
+                show_frame.expand_btn = expand_btn
+                show_frame.expand_var = expand_var
+                show_frame.show_var = show_var
+                show_frame.show_obj = show
+                show_frame.show_cb = show_cb
+                show_frame.season_frames = []
+                self.top_level_frames.append(show_frame)
+
+            # Update external pagination controls
+            for widget in self.pagination_frame.winfo_children():
+                widget.destroy()
+
+            prev_btn = ctk.CTkButton(self.pagination_frame, text="◀ Previous",
+                                     width=100, height=32,
+                                     command=lambda: load_show_page(page_num - 1),
+                                     state="normal" if page_num > 1 else "disabled")
+            prev_btn.grid(row=0, column=0, padx=5)
+
+            page_label = ctk.CTkLabel(self.pagination_frame,
+                                     text=f"Page {page_num} of {total_pages}",
+                                     font=ctk.CTkFont(size=12))
+            page_label.grid(row=0, column=1, padx=5)
+
+            next_btn = ctk.CTkButton(self.pagination_frame, text="Next ▶",
+                                     width=100, height=32,
+                                     command=lambda: load_show_page(page_num + 1),
+                                     state="normal" if page_num < total_pages else "disabled")
+            next_btn.grid(row=0, column=2, padx=5)
+
+            # Show pagination frame
+            self.pagination_frame.grid()
+
+            # Update status
+            self.update_status(f"Page {page_num}/{total_pages} ({start_idx + 1}-{end_idx} of {total_shows} shows)")
+
+        # Store the load function so it can be called when filters change
+        self.load_show_page = load_show_page
+
+        # Load first page
+        if shows:
+            load_show_page(1)
+        else:
+            self.pagination_frame.grid_remove()
+            self.update_status("No shows found")
 
     def toggle_show(self, show, frame, expand_var):
         """Toggle show expansion to show seasons/episodes."""
@@ -1018,66 +1282,111 @@ class MainAppFrame(ctk.CTkFrame):
             threading.Thread(target=load_episodes, daemon=True).start()
 
     def populate_episodes(self, season_frame, episodes):
-        """Populate episodes under a season."""
-        episode_container = ctk.CTkFrame(season_frame, fg_color="transparent")
-        episode_container.pack(fill="x", padx=(25, 0), pady=(2, 0))
+        """Populate episodes under a season with page navigation."""
+        # Container will be recreated on each page load
+        season_frame.all_episodes = episodes
+        season_frame.current_episode_page = 1
+        season_frame.episode_checkboxes = []
+        season_frame.episode_vars = []
 
-        # Store episode checkboxes and variables in the season frame
-        if not hasattr(season_frame, 'episode_checkboxes'):
-            season_frame.episode_checkboxes = []
-        if not hasattr(season_frame, 'episode_vars'):
-            season_frame.episode_vars = []
+        # Pagination settings
+        EPISODES_PER_PAGE = 15
+        total_episodes = len(episodes)
+        total_pages = (total_episodes + EPISODES_PER_PAGE - 1) // EPISODES_PER_PAGE
 
-        episode_frames = []  # Collect frames for background status loading
-
-        for episode in episodes:
-            episode_var = ctk.BooleanVar()
-
-            # Create a frame for each episode for better layout
-            ep_frame = ctk.CTkFrame(episode_container, fg_color="transparent")
-            ep_frame.pack(fill="x", pady=1)
-
-            # Add subtitle status indicator with placeholder (load status in background)
-            status_label = ctk.CTkLabel(ep_frame, text="○", width=20,
-                                       text_color="gray", font=ctk.CTkFont(size=12, weight="bold"))
-            status_label.pack(side="left", padx=(5, 5))
-
-            ep_cb = ctk.CTkCheckBox(ep_frame,
-                                   text=f"E{episode.index:02d} - {episode.title}",
-                                   variable=episode_var,
-                                   command=lambda e=episode, v=episode_var: self.on_item_selected(e, v))
-            ep_cb.pack(side="left", anchor="w", fill="x", expand=True)
-
-            # Store references for updating status
-            ep_frame.status_label = status_label
-            ep_frame.item_obj = episode
-
-            # Store references to checkbox and variable
-            season_frame.episode_checkboxes.append(ep_cb)
-            season_frame.episode_vars.append(episode_var)
-
-            # Add to list for background loading
-            episode_frames.append(ep_frame)
-
-        # Load subtitle status in background thread to avoid blocking UI
-        def load_subtitle_status():
-            if self._is_destroyed:
+        def load_episode_page(page_num):
+            """Load a specific page of episodes."""
+            if self._is_destroyed or page_num < 1 or page_num > total_pages:
                 return
-            for frame in episode_frames:
-                if self._is_destroyed:
-                    return
+
+            # Clear existing episode container if it exists
+            if hasattr(season_frame, 'episode_container'):
                 try:
-                    item = frame.item_obj
-                    has_subs = self.check_has_subtitles(item)
-                    status_icon = "✓" if has_subs else "✗"
-                    status_color = "#2d7a2d" if has_subs else "#8b0000"
-                    # Update UI on main thread
-                    self.safe_after(0, lambda f=frame, i=status_icon, c=status_color:
-                                   f.status_label.configure(text=i, text_color=c))
+                    season_frame.episode_container.destroy()
                 except:
                     pass
 
-        threading.Thread(target=load_subtitle_status, daemon=True).start()
+            # Create new container
+            episode_container = ctk.CTkFrame(season_frame, fg_color="transparent")
+            episode_container.pack(fill="x", padx=(25, 0), pady=(2, 0))
+            season_frame.episode_container = episode_container
+            season_frame.current_episode_page = page_num
+
+            # Calculate range
+            start_idx = (page_num - 1) * EPISODES_PER_PAGE
+            end_idx = min(start_idx + EPISODES_PER_PAGE, total_episodes)
+
+            # Create episode widgets for this page
+            page_frames = []
+            for i in range(start_idx, end_idx):
+                episode = episodes[i]
+                episode_var = ctk.BooleanVar()
+
+                ep_frame = ctk.CTkFrame(episode_container, fg_color="transparent")
+                ep_frame.pack(fill="x", pady=1)
+
+                status_label = ctk.CTkLabel(ep_frame, text="○", width=20,
+                                           text_color="gray", font=ctk.CTkFont(size=12, weight="bold"))
+                status_label.pack(side="left", padx=(5, 5))
+
+                ep_cb = ctk.CTkCheckBox(ep_frame,
+                                       text=f"E{episode.index:02d} - {episode.title}",
+                                       variable=episode_var,
+                                       command=lambda e=episode, v=episode_var: self.on_item_selected(e, v))
+                ep_cb.pack(side="left", anchor="w", fill="x", expand=True)
+
+                ep_frame.status_label = status_label
+                ep_frame.item_obj = episode
+                page_frames.append(ep_frame)
+
+            # Add pagination controls if more than one page
+            if total_pages > 1:
+                pagination_frame = ctk.CTkFrame(episode_container, fg_color="transparent")
+                pagination_frame.pack(fill="x", pady=(5, 0), padx=5)
+
+                prev_btn = ctk.CTkButton(pagination_frame, text="◀",
+                                         width=60, height=24,
+                                         command=lambda: load_episode_page(page_num - 1),
+                                         state="normal" if page_num > 1 else "disabled",
+                                         fg_color="transparent", border_width=1)
+                prev_btn.pack(side="left", padx=2)
+
+                page_label = ctk.CTkLabel(pagination_frame,
+                                         text=f"{page_num}/{total_pages}",
+                                         font=ctk.CTkFont(size=10))
+                page_label.pack(side="left", expand=True)
+
+                next_btn = ctk.CTkButton(pagination_frame, text="▶",
+                                         width=60, height=24,
+                                         command=lambda: load_episode_page(page_num + 1),
+                                         state="normal" if page_num < total_pages else "disabled",
+                                         fg_color="transparent", border_width=1)
+                next_btn.pack(side="right", padx=2)
+
+            # Load subtitle status in background
+            def start_subtitle_status_loading():
+                def load_subtitle_status():
+                    if self._is_destroyed:
+                        return
+                    for frame in page_frames:
+                        if self._is_destroyed:
+                            return
+                        try:
+                            item = frame.item_obj
+                            has_subs = self.check_has_subtitles(item)
+                            status_icon = "✓" if has_subs else "✗"
+                            status_color = "#2d7a2d" if has_subs else "#8b0000"
+                            self.safe_after(0, lambda f=frame, i=status_icon, c=status_color:
+                                           f.status_label.configure(text=i, text_color=c))
+                        except:
+                            pass
+                threading.Thread(target=load_subtitle_status, daemon=True).start()
+
+            self.after(50, start_subtitle_status_loading)
+
+        # Load first page
+        if episodes:
+            load_episode_page(1)
 
     def on_item_selected(self, item, var):
         """Handle individual item (movie/episode) selection."""
