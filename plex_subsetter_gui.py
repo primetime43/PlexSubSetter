@@ -288,6 +288,9 @@ class MainAppFrame(ctk.CTkFrame):
         self.search_results = {}  # Store search results: {item: [subtitles]}
         self.subtitle_status_cache = {}  # Cache subtitle status: {item_id: has_subs}
 
+        # Load settings
+        self.load_settings()
+
         # Configure subliminal cache (based on rustitles approach)
         try:
             # Set UTF-8 encoding for Python I/O
@@ -421,9 +424,13 @@ class MainAppFrame(ctk.CTkFrame):
                             font=ctk.CTkFont(size=24, weight="bold"))
         title.grid(row=0, column=0, sticky="w", padx=15, pady=15)
 
+        settings_btn = ctk.CTkButton(header_frame, text="⚙ Settings", command=self.open_settings,
+                                    width=100, fg_color="transparent", border_width=2)
+        settings_btn.grid(row=0, column=1, padx=(15, 5), pady=15)
+
         logout_btn = ctk.CTkButton(header_frame, text="Change Server", command=self.on_logout,
                                    width=120, fg_color="transparent", border_width=2)
-        logout_btn.grid(row=0, column=1, padx=15, pady=15)
+        logout_btn.grid(row=0, column=2, padx=(5, 15), pady=15)
 
         # === SUBTITLE OPTIONS ===
         options_frame = ctk.CTkFrame(right_panel)
@@ -1609,8 +1616,52 @@ class MainAppFrame(ctk.CTkFrame):
                     with open(subtitle_path, 'wb') as f:
                         f.write(selected_sub.content)
 
-                    # Upload to Plex server
-                    item.uploadSubtitles(subtitle_path)
+                    # Save subtitle based on user preference
+                    if self.subtitle_save_method == 'file':
+                        # Save subtitle next to video file
+                        try:
+                            # Get video file path from Plex
+                            if hasattr(item, 'media') and item.media:
+                                video_path = item.media[0].parts[0].file
+                                video_dir = os.path.dirname(video_path)
+                                video_base = os.path.splitext(os.path.basename(video_path))[0]
+
+                                # Create subtitle filename: VideoName.{lang}.srt
+                                final_subtitle_filename = f"{video_base}.{language_code}.srt"
+                                final_subtitle_path = os.path.join(video_dir, final_subtitle_filename)
+
+                                # Copy subtitle file to video directory
+                                import shutil
+                                shutil.copy2(subtitle_path, final_subtitle_path)
+
+                                self.log(f"Saved subtitle to: {final_subtitle_path}")
+
+                                # Trigger Plex partial scan to detect new subtitle
+                                try:
+                                    # Get the library section for this item
+                                    if isinstance(item, Episode):
+                                        library_section = item.section()
+                                    else:
+                                        library_section = item.section()
+
+                                    # Scan the specific file path
+                                    library_section.update(video_dir)
+                                    self.log(f"Triggered Plex scan for: {video_dir}")
+                                except Exception as scan_error:
+                                    self.log(f"Note: Could not trigger Plex scan: {scan_error}")
+                                    self.log("You may need to manually refresh the library in Plex")
+                            else:
+                                self.log(f"Warning: Could not get video file path for {title}")
+                                # Fallback to Plex upload
+                                item.uploadSubtitles(subtitle_path)
+                        except Exception as file_error:
+                            self.log(f"Error saving subtitle file: {file_error}")
+                            self.log("Falling back to Plex upload method")
+                            # Fallback to Plex upload if file save fails
+                            item.uploadSubtitles(subtitle_path)
+                    else:
+                        # Upload to Plex server (default behavior)
+                        item.uploadSubtitles(subtitle_path)
 
                     # Clean up temp file
                     try:
@@ -1791,6 +1842,147 @@ class MainAppFrame(ctk.CTkFrame):
             return f"{item.grandparentTitle} S{item.seasonNumber:02d}E{item.index:02d} - {item.title}"
         else:
             return item.title
+
+    def load_settings(self):
+        """Load application settings."""
+        config = configparser.ConfigParser()
+        config.read('config.ini')
+
+        # Subtitle save method: 'plex' or 'file'
+        self.subtitle_save_method = config.get('Settings', 'subtitle_save_method', fallback='plex')
+
+    def save_settings(self):
+        """Save application settings."""
+        config = configparser.ConfigParser()
+
+        # Read existing config to preserve other sections
+        config.read('config.ini')
+
+        # Create Settings section if it doesn't exist
+        if not config.has_section('Settings'):
+            config.add_section('Settings')
+
+        # Save subtitle save method
+        config.set('Settings', 'subtitle_save_method', self.subtitle_save_method)
+
+        # Write to file
+        with open('config.ini', 'w') as f:
+            config.write(f)
+
+    def open_settings(self):
+        """Open settings dialog."""
+        settings_window = ctk.CTkToplevel(self)
+        settings_window.title("Settings")
+        settings_window.geometry("650x500")
+        settings_window.transient(self)
+        settings_window.grab_set()
+
+        # Center window
+        settings_window.update_idletasks()
+        x = (settings_window.winfo_screenwidth() // 2) - (650 // 2)
+        y = (settings_window.winfo_screenheight() // 2) - (500 // 2)
+        settings_window.geometry(f"650x500+{x}+{y}")
+
+        # Main container
+        main_frame = ctk.CTkFrame(settings_window)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # Title
+        ctk.CTkLabel(main_frame, text="⚙ Settings",
+                    font=ctk.CTkFont(size=24, weight="bold")).pack(anchor="w", pady=(0, 20))
+
+        # === SUBTITLE SAVE METHOD ===
+        save_method_frame = ctk.CTkFrame(main_frame, fg_color=("gray85", "gray25"))
+        save_method_frame.pack(fill="x", pady=(0, 15))
+        save_method_frame.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(save_method_frame, text="Subtitle Save Method",
+                    font=ctk.CTkFont(size=16, weight="bold")).grid(
+            row=0, column=0, sticky="w", padx=15, pady=(15, 5))
+
+        # Radio buttons for save method
+        save_method_var = ctk.StringVar(value=self.subtitle_save_method)
+
+        # Option 1: Upload to Plex
+        plex_radio = ctk.CTkRadioButton(
+            save_method_frame,
+            text="Upload to Plex (Default)",
+            variable=save_method_var,
+            value="plex"
+        )
+        plex_radio.grid(row=1, column=0, sticky="w", padx=20, pady=(10, 5))
+
+        plex_desc = ctk.CTkLabel(
+            save_method_frame,
+            text="• Subtitles are uploaded to Plex's internal database\n"
+                 "• Works with remote Plex servers (no file access needed)\n"
+                 "• Subtitles survive even if video files move\n"
+                 "• Subtitles stored in Plex's Metadata directory",
+            font=ctk.CTkFont(size=11),
+            text_color="gray",
+            justify="left"
+        )
+        plex_desc.grid(row=2, column=0, sticky="w", padx=40, pady=(0, 10))
+
+        # Show Plex metadata path
+        try:
+            if sys.platform.startswith('win'):
+                plex_path = os.path.expandvars("%LOCALAPPDATA%\\Plex Media Server\\Media\\localhost")
+            elif sys.platform == 'darwin':
+                plex_path = os.path.expanduser("~/Library/Application Support/Plex Media Server/Media/localhost")
+            else:
+                plex_path = "/var/lib/plexmediaserver/Library/Application Support/Plex Media Server/Media/localhost"
+
+            plex_path_label = ctk.CTkLabel(
+                save_method_frame,
+                text=f"  Path: {plex_path}",
+                font=ctk.CTkFont(size=10, family="Courier"),
+                text_color="#e5a00d"
+            )
+            plex_path_label.grid(row=3, column=0, sticky="w", padx=40, pady=(0, 15))
+        except:
+            pass
+
+        # Option 2: Save next to video file
+        file_radio = ctk.CTkRadioButton(
+            save_method_frame,
+            text="Save next to video file",
+            variable=save_method_var,
+            value="file"
+        )
+        file_radio.grid(row=4, column=0, sticky="w", padx=20, pady=(5, 5))
+
+        file_desc = ctk.CTkLabel(
+            save_method_frame,
+            text="• Subtitles saved in same directory as video files\n"
+                 "• Requires access to Plex server file system\n"
+                 "• Standard naming: VideoName.en.srt, VideoName.es.srt, etc.\n"
+                 "• Plex will auto-detect subtitles on next scan",
+            font=ctk.CTkFont(size=11),
+            text_color="gray",
+            justify="left"
+        )
+        file_desc.grid(row=5, column=0, sticky="w", padx=40, pady=(0, 15))
+
+        # === SAVE BUTTON ===
+        def save_and_close():
+            self.subtitle_save_method = save_method_var.get()
+            self.save_settings()
+            self.update_status(f"Settings saved - Using {self.subtitle_save_method} save method")
+            settings_window.destroy()
+
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame.pack(fill="x", pady=(20, 0))
+
+        cancel_btn = ctk.CTkButton(button_frame, text="Cancel",
+                                   command=settings_window.destroy,
+                                   width=100, fg_color="transparent", border_width=2)
+        cancel_btn.pack(side="right", padx=(10, 0))
+
+        save_btn = ctk.CTkButton(button_frame, text="Save Settings",
+                                command=save_and_close,
+                                width=120)
+        save_btn.pack(side="right")
 
 
 class PlexSubSetterApp(ctk.CTk):
