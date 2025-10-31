@@ -1955,14 +1955,24 @@ class MainAppFrame(ctk.CTkFrame):
         file_desc = ctk.CTkLabel(
             save_method_frame,
             text="• Subtitles saved in same directory as video files\n"
-                 "• Requires access to Plex server file system\n"
                  "• Standard naming: VideoName.en.srt, VideoName.es.srt, etc.\n"
                  "• Plex will auto-detect subtitles on next scan",
             font=ctk.CTkFont(size=11),
             text_color="gray",
             justify="left"
         )
-        file_desc.grid(row=5, column=0, sticky="w", padx=40, pady=(0, 15))
+        file_desc.grid(row=5, column=0, sticky="w", padx=40, pady=(0, 5))
+
+        # Warning note about network requirement
+        file_warning = ctk.CTkLabel(
+            save_method_frame,
+            text="⚠ Note: Only works with local Plex servers or network-accessible file systems.\n"
+                 "   Will not work with remote Plex servers accessed over the internet.",
+            font=ctk.CTkFont(size=10),
+            text_color="#e5a00d",
+            justify="left"
+        )
+        file_warning.grid(row=6, column=0, sticky="w", padx=40, pady=(0, 15))
 
         # === SAVE BUTTON ===
         def save_and_close():
