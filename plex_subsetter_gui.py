@@ -1278,6 +1278,18 @@ class MainAppFrame(ctk.CTkFrame):
                                 forced = "[F]" if hasattr(sub, 'forced') and sub.forced else ""
                                 sdh = "[SDH]" if hasattr(sub, 'hearingImpaired') and sub.hearingImpaired else ""
 
+                                # Get subtitle file name or title
+                                sub_detail = ""
+                                if hasattr(sub, 'title') and sub.title:
+                                    sub_detail = f" - {sub.title}"
+                                elif hasattr(sub, 'key') and sub.key:
+                                    try:
+                                        filename = sub.key.split('/')[-1]
+                                        if filename:
+                                            sub_detail = f" - {filename}"
+                                    except:
+                                        pass
+
                                 # Check if this subtitle is selected
                                 is_selected = False
                                 if hasattr(sub, 'selected'):
@@ -1286,11 +1298,11 @@ class MainAppFrame(ctk.CTkFrame):
                                 status = "[SEL]" if is_selected else "     "
 
                                 # Store info for all subtitles
-                                sub_info = f"{status} {lang} ({codec}) {forced} {sdh}".strip()
+                                sub_info = f"{status} {lang} ({codec}) {forced} {sdh}{sub_detail}".strip()
                                 all_subs_info.append(sub_info)
 
                                 if is_selected and not selected_sub:
-                                    selected_sub = f"{lang} ({codec}) {forced} {sdh}".strip()
+                                    selected_sub = f"{lang} ({codec}) {forced} {sdh}{sub_detail}".strip()
 
                 # Format output message
                 msg = f"📊 {title}"
@@ -1358,29 +1370,30 @@ class MainAppFrame(ctk.CTkFrame):
             status_color = "#2d7a2d" if has_subs else "#8b0000"
             frame.status_label.configure(text=status_icon, text_color=status_color)
 
+        def search_frames_recursive(widget, item_ids=None):
+            """Recursively search for frames with item_obj."""
+            # Check current widget
+            if hasattr(widget, 'item_obj'):
+                if item_ids is None or widget.item_obj.ratingKey in item_ids:
+                    update_indicator(widget)
+
+            # Recursively check all children
+            try:
+                for child in widget.winfo_children():
+                    search_frames_recursive(child, item_ids)
+            except:
+                pass
+
         # If specific items provided, only refresh those
         if items_to_refresh:
             item_ids = {item.ratingKey for item in items_to_refresh}
-
-            # Search through browser for matching frames
+            # Search all widgets recursively
             for widget in self.browser_scroll.winfo_children():
-                if hasattr(widget, 'item_obj') and widget.item_obj.ratingKey in item_ids:
-                    update_indicator(widget)
-                # Check nested episode frames
-                for child in widget.winfo_children():
-                    for subchild in child.winfo_children():
-                        if hasattr(subchild, 'item_obj') and subchild.item_obj.ratingKey in item_ids:
-                            update_indicator(subchild)
+                search_frames_recursive(widget, item_ids)
         else:
             # Refresh all indicators
             for widget in self.browser_scroll.winfo_children():
-                if hasattr(widget, 'item_obj'):
-                    update_indicator(widget)
-                # Check nested episode frames
-                for child in widget.winfo_children():
-                    for subchild in child.winfo_children():
-                        if hasattr(subchild, 'item_obj'):
-                            update_indicator(subchild)
+                search_frames_recursive(widget)
 
     def get_video_items(self):
         """Get selected video items."""
@@ -1733,7 +1746,20 @@ class MainAppFrame(ctk.CTkFrame):
                                         forced = " [Forced]" if sub.forced else ""
                                         sdh = " [SDH]" if sub.hearingImpaired else ""
 
-                                        sub_text = f"{selected} {language} ({codec}){forced}{sdh}"
+                                        # Get subtitle file name or title
+                                        sub_detail = ""
+                                        if hasattr(sub, 'title') and sub.title:
+                                            sub_detail = f" - {sub.title}"
+                                        elif hasattr(sub, 'key') and sub.key:
+                                            # Extract filename from key path
+                                            try:
+                                                filename = sub.key.split('/')[-1]
+                                                if filename:
+                                                    sub_detail = f" - {filename}"
+                                            except:
+                                                pass
+
+                                        sub_text = f"{selected} {language} ({codec}){forced}{sdh}{sub_detail}"
                                         text_color = "#2d7a2d" if sub.selected else "gray"
 
                                         ctk.CTkLabel(item_frame, text=sub_text,
