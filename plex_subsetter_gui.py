@@ -420,7 +420,8 @@ class MainAppFrame(ctk.CTkFrame):
         right_panel = ctk.CTkFrame(self, fg_color="transparent")
         right_panel.grid(row=0, column=1, sticky="nsew", padx=(10, 20), pady=20)
         right_panel.grid_columnconfigure(0, weight=1)
-        right_panel.grid_rowconfigure(4, weight=1)
+        right_panel.grid_rowconfigure(3, weight=1)  # Info panel can expand
+        right_panel.grid_rowconfigure(5, weight=1)  # Log container can expand
 
         # === HEADER ===
         header_frame = ctk.CTkFrame(right_panel)
@@ -547,8 +548,9 @@ class MainAppFrame(ctk.CTkFrame):
 
         # === OUTPUT LOG (Smaller, collapsible) ===
         self.log_container = ctk.CTkFrame(right_panel)
-        self.log_container.grid(row=5, column=0, sticky="ew", pady=(10, 0))
+        self.log_container.grid(row=5, column=0, sticky="nsew", pady=(10, 0))
         self.log_container.grid_columnconfigure(0, weight=1)
+        self.log_container.grid_rowconfigure(1, weight=1)  # Log text frame can expand
 
         log_header = ctk.CTkFrame(self.log_container, fg_color="transparent")
         log_header.grid(row=0, column=0, sticky="ew", padx=15, pady=(10, 5))
@@ -565,13 +567,14 @@ class MainAppFrame(ctk.CTkFrame):
 
         # Text widget with proper wrapping (smaller)
         self.log_text_frame = ctk.CTkFrame(self.log_container)
-        self.log_text_frame.grid(row=1, column=0, sticky="ew", padx=15, pady=(0, 10))
+        self.log_text_frame.grid(row=1, column=0, sticky="nsew", padx=15, pady=(0, 10))
         self.log_text_frame.grid_columnconfigure(0, weight=1)
+        self.log_text_frame.grid_rowconfigure(0, weight=1)
         self.log_text_frame.grid_remove()  # Start collapsed
 
-        self.output_text = ctk.CTkTextbox(self.log_text_frame, wrap="word", height=120,
+        self.output_text = ctk.CTkTextbox(self.log_text_frame, wrap="word",
                                           font=ctk.CTkFont(size=11))
-        self.output_text.pack(fill="both", expand=True)
+        self.output_text.pack(fill="both", expand=True, padx=2, pady=2)
 
         # === PROGRESS BAR ===
         self.progress_bar = ctk.CTkProgressBar(right_panel, mode="indeterminate")
