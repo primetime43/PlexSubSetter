@@ -9,10 +9,16 @@ from tkinter import messagebox
 import threading
 import configparser
 import os
+import sys
+import tempfile
 import webbrowser
 from plexapi.myplex import MyPlexAccount, MyPlexPinLogin
 from plexapi.server import PlexServer
 from plexapi.video import Movie, Episode, Show, Season
+from subliminal import region, save_subtitles, download_best_subtitles, download_subtitles
+from subliminal.video import Episode as SubliminalEpisode, Movie as SubliminalMovie
+from subliminal.providers.opensubtitles import OpenSubtitlesProvider
+from babelfish import Language
 
 
 # Set appearance and theme
@@ -59,6 +65,15 @@ SET_LANGUAGES = {
     "Danish": "dan",
     "Finnish": "fin",
     "Norwegian": "nor"
+}
+
+# Subtitle providers
+SUBTITLE_PROVIDERS = {
+    "OpenSubtitles": "opensubtitles",
+    "Podnapisi": "podnapisi",
+    "TVSubtitles": "tvsubtitles",
+    "Addic7ed": "addic7ed",
+    "Subscene": "subscene"
 }
 
 
@@ -290,6 +305,26 @@ class MainAppFrame(ctk.CTkFrame):
         self.top_level_frames = []  # Store only top-level show/movie frames for filtering
         self.search_text = ctk.StringVar()
         self.search_text.trace_add("write", lambda *args: self.filter_items())
+        self.search_results = {}  # Store search results: {item: [subtitles]}
+
+        # Configure subliminal cache (based on rustitles approach)
+        try:
+            # Set UTF-8 encoding for Python I/O
+            if sys.platform.startswith('win'):
+                os.environ['PYTHONIOENCODING'] = 'utf-8'
+
+            # Configure cache directory
+            cache_dir = os.path.join(tempfile.gettempdir(), 'plexsubsetter_cache')
+            os.makedirs(cache_dir, exist_ok=True)
+
+            # Use memory backend on Windows to avoid DBM issues
+            if sys.platform.startswith('win'):
+                region.configure('dogpile.cache.memory')
+            else:
+                cache_file = os.path.join(cache_dir, 'cachefile.dbm')
+                region.configure('dogpile.cache.dbm', arguments={'filename': cache_file})
+        except:
+            pass  # Cache already configured
 
         # Configure grid - two column layout
         self.grid_columnconfigure(0, weight=0, minsize=380)  # Browser panel
@@ -449,6 +484,16 @@ class MainAppFrame(ctk.CTkFrame):
         self.set_lang_combo.set("English")
         self.set_lang_combo.pack(fill="x", pady=(0, 10))
 
+        # Provider selection (spanning both columns)
+        provider_frame = ctk.CTkFrame(options_frame, fg_color="transparent")
+        provider_frame.grid(row=1, column=0, columnspan=2, padx=15, pady=(0, 15), sticky="ew")
+
+        ctk.CTkLabel(provider_frame, text="Subtitle Provider:", font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(0, 5))
+        self.provider_combo = ctk.CTkComboBox(provider_frame, values=list(SUBTITLE_PROVIDERS.keys()),
+                                             state="readonly", height=32)
+        self.provider_combo.set("OpenSubtitles")
+        self.provider_combo.pack(fill="x", pady=(0, 0))
+
         # === ACTION BUTTONS ===
         actions_frame = ctk.CTkFrame(right_panel)
         actions_frame.grid(row=2, column=0, sticky="ew", pady=10)
@@ -456,28 +501,34 @@ class MainAppFrame(ctk.CTkFrame):
         for i in range(4):
             actions_frame.grid_columnconfigure(i, weight=1)
 
-        self.search_btn = ctk.CTkButton(actions_frame, text="🔍 Search & Download",
+        self.search_btn = ctk.CTkButton(actions_frame, text="🔍 Search Available",
                                        command=self.search_subtitles, height=40,
                                        state="disabled")
         self.search_btn.grid(row=0, column=0, padx=5, pady=15, sticky="ew")
 
-        self.list_btn = ctk.CTkButton(actions_frame, text="📋 List Subtitles",
+        self.download_btn = ctk.CTkButton(actions_frame, text="⬇ Download Best",
+                                         command=self.download_subtitles, height=40,
+                                         fg_color="#1f538d", hover_color="#1a4472",
+                                         state="disabled")
+        self.download_btn.grid(row=0, column=1, padx=5, pady=15, sticky="ew")
+
+        self.list_btn = ctk.CTkButton(actions_frame, text="📋 List Current",
                                      command=self.list_subtitles, height=40,
-                                     fg_color="#1f538d", hover_color="#1a4472",
+                                     fg_color="#6b4f9d", hover_color="#553d7d",
                                      state="disabled")
-        self.list_btn.grid(row=0, column=1, padx=5, pady=15, sticky="ew")
+        self.list_btn.grid(row=0, column=2, padx=5, pady=15, sticky="ew")
 
         self.set_btn = ctk.CTkButton(actions_frame, text="✓ Set Language",
                                     command=self.set_subtitles, height=40,
                                     fg_color="#2d7a2d", hover_color="#236123",
                                     state="disabled")
-        self.set_btn.grid(row=0, column=2, padx=5, pady=15, sticky="ew")
+        self.set_btn.grid(row=0, column=3, padx=5, pady=15, sticky="ew")
 
-        self.disable_btn = ctk.CTkButton(actions_frame, text="✗ Disable Subtitles",
+        self.disable_btn = ctk.CTkButton(actions_frame, text="✗ Disable All",
                                         command=self.disable_subtitles, height=40,
                                         fg_color="#8b0000", hover_color="#6b0000",
                                         state="disabled")
-        self.disable_btn.grid(row=0, column=3, padx=5, pady=15, sticky="ew")
+        self.disable_btn.grid(row=1, column=0, columnspan=4, padx=5, pady=(0, 15), sticky="ew")
 
         # === OUTPUT LOG ===
         log_frame = ctk.CTkFrame(right_panel)
@@ -1056,12 +1107,16 @@ class MainAppFrame(ctk.CTkFrame):
         count = len(self.selected_items)
         self.selection_label.configure(text=f"{count} item{'s' if count != 1 else ''} selected")
 
-        # Enable/disable action buttons
+        # Enable/disable action buttons based on selection
         state = "normal" if count > 0 else "disabled"
         self.search_btn.configure(state=state)
         self.list_btn.configure(state=state)
         self.set_btn.configure(state=state)
         self.disable_btn.configure(state=state)
+
+        # Download button only enabled if we have search results
+        download_state = "normal" if self.search_results else "disabled"
+        self.download_btn.configure(state=download_state)
 
     def show_subtitle_status(self, item):
         """Show current subtitle status for a video item."""
@@ -1136,13 +1191,13 @@ class MainAppFrame(ctk.CTkFrame):
         return self.selected_items
 
     def search_subtitles(self):
-        """Search and download subtitles."""
+        """Search for available subtitles (does not download)."""
         def task():
             self.show_progress()
             self.disable_action_buttons()
 
             self.log("\n" + "="*60)
-            self.log("SEARCHING FOR SUBTITLES")
+            self.log("SEARCHING AVAILABLE SUBTITLES")
             self.log("="*60)
 
             items = self.get_video_items()
@@ -1153,29 +1208,182 @@ class MainAppFrame(ctk.CTkFrame):
                 return
 
             language_name = self.search_lang_combo.get()
-            language = SEARCH_LANGUAGES[language_name]
+            language_code = SEARCH_LANGUAGES[language_name]
+            provider_name = self.provider_combo.get()
+            provider = SUBTITLE_PROVIDERS[provider_name]
             sdh = self.sdh_var.get()
-            forced = self.forced_var.get()
 
-            self.log(f"Processing {len(items)} item(s)...")
-            self.log(f"Language: {language_name} ({language}), SDH: {sdh}, Forced: {forced}\n")
+            self.log(f"Searching {len(items)} item(s)...")
+            self.log(f"Provider: {provider_name}")
+            self.log(f"Language: {language_name} ({language_code}), SDH: {sdh}\n")
 
+            # Clear previous search results
+            self.search_results = {}
+
+            from subliminal import list_subtitles
+            # Use fromalpha2 for 2-letter codes (en, es, etc.)
+            language_obj = Language.fromalpha2(language_code)
+
+            total_found = 0
             for item in items:
                 title = self._get_item_title(item)
                 try:
-                    subtitles = item.searchSubtitles(language=language,
-                                                    hearingImpaired=sdh,
-                                                    forced=forced)
-                    if subtitles:
-                        self.log(f"✓ {title} - {len(subtitles)} subtitle(s) found")
-                        item.downloadSubtitles(subtitles[0])
-                        self.log(f"    → Downloading...")
-                    else:
-                        self.log(f"  {title} - No subtitles found")
-                except Exception as e:
-                    self.log(f"✗ {title} - {e}")
+                    self.log(f"🔍 {title}")
 
-            self.log("\n✓ Search completed\n")
+                    # Create subliminal Video object from Plex metadata (no file access needed)
+                    if isinstance(item, Episode):
+                        # TV Episode - create a fake filename for subliminal
+                        fake_name = f"{item.grandparentTitle}.S{item.seasonNumber:02d}E{item.index:02d}.mkv"
+                        video = SubliminalEpisode(
+                            name=fake_name,
+                            series=item.grandparentTitle,
+                            season=item.seasonNumber,
+                            episodes=item.index  # Single episode number as int
+                        )
+                        # Set additional attributes
+                        video.title = item.title
+                        if hasattr(item, 'year') and item.year:
+                            video.year = item.year
+                    elif isinstance(item, Movie):
+                        # Movie - create a fake filename
+                        year = getattr(item, 'year', '')
+                        fake_name = f"{item.title}.{year}.mkv" if year else f"{item.title}.mkv"
+                        video = SubliminalMovie(
+                            name=fake_name,
+                            title=item.title,
+                            year=getattr(item, 'year', None)
+                        )
+                    else:
+                        self.log(f"  ✗ Unsupported item type")
+                        continue
+
+                    # List available subtitles
+                    subtitles = list_subtitles({video}, {language_obj}, providers=[provider])
+
+                    if video in subtitles and subtitles[video]:
+                        subs_list = list(subtitles[video])
+                        self.search_results[item] = subs_list
+                        self.log(f"  ✓ Found {len(subs_list)} subtitle(s)")
+
+                        # Show top 5 results
+                        for i, sub in enumerate(subs_list[:5], 1):
+                            # Try different attributes to get useful info
+                            release_info = (
+                                getattr(sub, 'movie_release_name', None) or  # OpenSubtitles
+                                getattr(sub, 'release', None) or  # Some providers
+                                getattr(sub, 'filename', None) or  # Generic
+                                getattr(sub, 'info', None) or  # Some providers
+                                f"ID: {getattr(sub, 'subtitle_id', 'Unknown')}"  # Fallback to ID
+                            )
+                            # Add provider name for clarity
+                            provider_info = f"[{getattr(sub, 'provider_name', provider_name)}]"
+                            self.log(f"    {i}. {provider_info} {str(release_info)[:80]}")
+                        if len(subs_list) > 5:
+                            self.log(f"    ... and {len(subs_list) - 5} more")
+
+                        total_found += len(subs_list)
+                    else:
+                        self.log(f"  ✗ No subtitles found")
+
+                except Exception as e:
+                    self.log(f"  ✗ Error: {e}")
+
+            self.log(f"\n✓ Search completed - Found {total_found} subtitle(s) for {len(self.search_results)} item(s)")
+            if self.search_results:
+                self.log("💡 Click 'Download Best' to download the top match for each item\n")
+            else:
+                self.log("")
+
+            self.hide_progress()
+            self.enable_action_buttons()
+
+        threading.Thread(target=task, daemon=True).start()
+
+    def download_subtitles(self):
+        """Download best subtitles from last search results."""
+        def task():
+            self.show_progress()
+            self.disable_action_buttons()
+
+            self.log("\n" + "="*60)
+            self.log("DOWNLOADING SUBTITLES")
+            self.log("="*60)
+
+            if not self.search_results:
+                self.log("✗ No search results available. Please search first.\n")
+                self.hide_progress()
+                self.enable_action_buttons()
+                return
+
+            language_name = self.search_lang_combo.get()
+            language_code = SEARCH_LANGUAGES[language_name]
+            # Use fromalpha2 for 2-letter codes (en, es, etc.)
+            language_obj = Language.fromalpha2(language_code)
+
+            provider_name = self.provider_combo.get()
+            provider = SUBTITLE_PROVIDERS[provider_name]
+
+            self.log(f"Downloading subtitles for {len(self.search_results)} item(s)...\n")
+
+            success_count = 0
+            for item, subs_list in self.search_results.items():
+                title = self._get_item_title(item)
+                try:
+                    if not subs_list:
+                        continue
+
+                    # Get best subtitle (first in list, already scored)
+                    best_sub = subs_list[0]
+
+                    self.log(f"⬇ {title}")
+                    # Get useful info about the subtitle
+                    release_info = (
+                        getattr(best_sub, 'movie_release_name', None) or
+                        getattr(best_sub, 'release', None) or
+                        getattr(best_sub, 'filename', None) or
+                        getattr(best_sub, 'info', None) or
+                        f"ID: {getattr(best_sub, 'subtitle_id', 'Unknown')}"
+                    )
+                    provider_info = getattr(best_sub, 'provider_name', provider)
+                    self.log(f"  Downloading from {provider_info}: {release_info}")
+
+                    # Download the subtitle content using subliminal API
+                    download_subtitles([best_sub], providers=[provider])
+
+                    # Save to temporary file
+                    import tempfile
+                    temp_dir = tempfile.gettempdir()
+
+                    # Create filename based on item type
+                    if isinstance(item, Episode):
+                        subtitle_filename = f"{item.grandparentTitle}.S{item.seasonNumber:02d}E{item.index:02d}.{language_code}.srt"
+                    else:
+                        subtitle_filename = f"{item.title}.{language_code}.srt"
+
+                    # Remove invalid filename characters
+                    subtitle_filename = "".join(c for c in subtitle_filename if c.isalnum() or c in (' ', '.', '_', '-'))
+                    subtitle_path = os.path.join(temp_dir, subtitle_filename)
+
+                    # Write subtitle content to file
+                    with open(subtitle_path, 'wb') as f:
+                        f.write(best_sub.content)
+
+                    # Upload to Plex server
+                    item.uploadSubtitles(subtitle_path)
+
+                    # Clean up temp file
+                    try:
+                        os.remove(subtitle_path)
+                    except:
+                        pass
+
+                    self.log(f"  ✓ Downloaded and uploaded to Plex")
+                    success_count += 1
+
+                except Exception as e:
+                    self.log(f"  ✗ Error: {e}")
+
+            self.log(f"\n✓ Download completed - {success_count}/{len(self.search_results)} successful\n")
             self.hide_progress()
             self.enable_action_buttons()
 
@@ -1328,6 +1536,7 @@ class MainAppFrame(ctk.CTkFrame):
     def disable_action_buttons(self):
         """Disable action buttons."""
         self.search_btn.configure(state="disabled")
+        self.download_btn.configure(state="disabled")
         self.list_btn.configure(state="disabled")
         self.set_btn.configure(state="disabled")
         self.disable_btn.configure(state="disabled")
@@ -1340,6 +1549,11 @@ class MainAppFrame(ctk.CTkFrame):
         self.list_btn.configure(state=state)
         self.set_btn.configure(state=state)
         self.disable_btn.configure(state=state)
+
+        # Download button only enabled if we have search results
+        download_state = "normal" if self.search_results else "disabled"
+        self.download_btn.configure(state=download_state)
+
         self.refresh_browser_btn.configure(state="normal")
 
     def _get_item_title(self, item):

@@ -40,4 +40,7 @@ config.ini
 .DS_Store
 Thumbs.db
 
+# Subliminal cache
+cachefile.dbm*
+
 .claude/
