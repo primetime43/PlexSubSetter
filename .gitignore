@@ -47,4 +47,9 @@ cachefile.dbm*
 logs/
 *.log
 
+# Build artifacts
+build/
+dist/
+*.spec
+
 .claude/
