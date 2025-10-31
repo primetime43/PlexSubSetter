@@ -47,26 +47,6 @@ SEARCH_LANGUAGES = {
     "Norwegian": "no"
 }
 
-SET_LANGUAGES = {
-    "English": "eng",
-    "Spanish": "spa",
-    "French": "fre",
-    "German": "ger",
-    "Italian": "ita",
-    "Portuguese": "por",
-    "Japanese": "jpn",
-    "Korean": "kor",
-    "Chinese": "chi",
-    "Russian": "rus",
-    "Arabic": "ara",
-    "Dutch": "dut",
-    "Polish": "pol",
-    "Swedish": "swe",
-    "Danish": "dan",
-    "Finnish": "fin",
-    "Norwegian": "nor"
-}
-
 # Subtitle providers
 SUBTITLE_PROVIDERS = {
     "OpenSubtitles": "opensubtitles",
@@ -475,15 +455,7 @@ class MainAppFrame(ctk.CTkFrame):
                                            variable=self.forced_var)
         self.forced_check.pack(side="left")
 
-        # Right column - Set language
-        right_col = ctk.CTkFrame(options_frame, fg_color="transparent")
-        right_col.grid(row=0, column=1, padx=(10, 15), pady=15, sticky="new")
-
-        ctk.CTkLabel(right_col, text="Set Language:", font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(0, 5))
-        self.set_lang_combo = ctk.CTkComboBox(right_col, values=list(SET_LANGUAGES.keys()),
-                                             state="readonly", height=32)
-        self.set_lang_combo.set("English")
-        self.set_lang_combo.pack(fill="x", pady=(0, 10))
+        # Right column - (removed Set Language dropdown)
 
         # Provider selection (spanning both columns)
         provider_frame = ctk.CTkFrame(options_frame, fg_color="transparent")
@@ -499,7 +471,7 @@ class MainAppFrame(ctk.CTkFrame):
         actions_frame = ctk.CTkFrame(right_panel)
         actions_frame.grid(row=2, column=0, sticky="ew", pady=10)
 
-        for i in range(4):
+        for i in range(3):
             actions_frame.grid_columnconfigure(i, weight=1)
 
         self.search_btn = ctk.CTkButton(actions_frame, text="🔍 Search Available",
@@ -518,12 +490,6 @@ class MainAppFrame(ctk.CTkFrame):
                                      fg_color="#6b4f9d", hover_color="#553d7d",
                                      state="disabled")
         self.list_btn.grid(row=0, column=2, padx=5, pady=15, sticky="ew")
-
-        self.set_btn = ctk.CTkButton(actions_frame, text="✓ Set Language",
-                                    command=self.set_subtitles, height=40,
-                                    fg_color="#2d7a2d", hover_color="#236123",
-                                    state="disabled")
-        self.set_btn.grid(row=0, column=3, padx=5, pady=15, sticky="ew")
 
         # === INFO PANEL (multi-purpose: subtitle selection, current subs, results) ===
         self.info_frame = ctk.CTkFrame(right_panel)
@@ -1242,7 +1208,6 @@ class MainAppFrame(ctk.CTkFrame):
         state = "normal" if count > 0 else "disabled"
         self.search_btn.configure(state=state)
         self.list_btn.configure(state=state)
-        self.set_btn.configure(state=state)
 
         # Download button only enabled if we have search results
         download_state = "normal" if self.search_results else "disabled"
@@ -1789,54 +1754,6 @@ class MainAppFrame(ctk.CTkFrame):
 
         threading.Thread(target=task, daemon=True).start()
 
-    def set_subtitles(self):
-        """Set subtitle by language."""
-        def task():
-            self.show_progress()
-            self.disable_action_buttons()
-
-            self.log("\n" + "="*60)
-            self.log("SETTING SUBTITLE STREAMS")
-            self.log("="*60)
-
-            items = self.get_video_items()
-            if not items:
-                self.log("✗ No items selected\n")
-                self.hide_progress()
-                self.enable_action_buttons()
-                return
-
-            language_name = self.set_lang_combo.get()
-            language = SET_LANGUAGES[language_name]
-            self.log(f"Processing {len(items)} item(s)...")
-            self.log(f"Setting to: {language_name} ({language})\n")
-
-            success_count = 0
-            for item in items:
-                title = self._get_item_title(item)
-                try:
-                    found = False
-                    for media in item.media:
-                        for part in media.parts:
-                            subs = part.subtitleStreams()
-                            target_sub = next((s for s in subs if s.languageCode == language), None)
-                            if target_sub:
-                                part.setSelectedSubtitleStream(target_sub)
-                                self.log(f"✓ {title}")
-                                found = True
-                                success_count += 1
-                                break
-                    if not found:
-                        self.log(f"  {title} - No {language_name} subtitles")
-                except Exception as e:
-                    self.log(f"✗ {title} - {e}")
-
-            self.log(f"\n✓ Set {success_count}/{len(items)} items\n")
-            self.hide_progress()
-            self.enable_action_buttons()
-
-        threading.Thread(target=task, daemon=True).start()
-
     def show_progress(self):
         """Show progress bar."""
         self.progress_bar.grid()
@@ -1852,7 +1769,6 @@ class MainAppFrame(ctk.CTkFrame):
         self.search_btn.configure(state="disabled")
         self.download_btn.configure(state="disabled")
         self.list_btn.configure(state="disabled")
-        self.set_btn.configure(state="disabled")
         self.refresh_browser_btn.configure(state="disabled")
 
     def enable_action_buttons(self):
@@ -1860,7 +1776,6 @@ class MainAppFrame(ctk.CTkFrame):
         state = "normal" if self.selected_items else "disabled"
         self.search_btn.configure(state=state)
         self.list_btn.configure(state=state)
-        self.set_btn.configure(state=state)
 
         # Download button only enabled if we have search results
         download_state = "normal" if self.search_results else "disabled"
