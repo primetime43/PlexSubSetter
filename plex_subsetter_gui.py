@@ -217,11 +217,18 @@ class ServerSelectionFrame(ctk.CTkFrame):
 
                 self.after(0, lambda: self.status_label.configure(text=""))
 
-                for i, resource in enumerate(servers):
-                    def create_server_button(res):
+                # Separate servers into online and offline
+                online_servers = [s for s in servers if s.presence]
+                offline_servers = [s for s in servers if not s.presence]
+
+                # Combine with online servers first, then offline
+                sorted_servers = online_servers + offline_servers
+
+                for i, resource in enumerate(sorted_servers):
+                    def create_server_button(res, row_index):
                         # Server card
                         card = ctk.CTkFrame(container)
-                        card.grid(row=i, column=0, pady=5, padx=5, sticky="ew")
+                        card.grid(row=row_index, column=0, pady=5, padx=5, sticky="ew")
                         card.grid_columnconfigure(0, weight=1)
 
                         # Server info
@@ -248,7 +255,7 @@ class ServerSelectionFrame(ctk.CTkFrame):
                                                    width=120)
                         connect_btn.grid(row=0, column=1, rowspan=3, padx=15, pady=10)
 
-                    self.after(0, lambda r=resource: create_server_button(r))
+                    self.after(0, lambda r=resource, idx=i: create_server_button(r, idx))
 
             except Exception as e:
                 self.after(0, lambda: self.status_label.configure(
