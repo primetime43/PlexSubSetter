@@ -775,18 +775,16 @@ class MainAppFrame(ctk.CTkFrame):
         # Clear top-level frames list
         self.top_level_frames.clear()
 
+        movie_frames = []  # Collect frames for background status loading
+
         for movie in movies:
             var = ctk.BooleanVar()
             frame = ctk.CTkFrame(self.browser_scroll, fg_color="transparent")
             frame.pack(fill="x", pady=2, padx=5)
 
-            # Add subtitle status indicator
-            has_subs = self.check_has_subtitles(movie)
-            status_icon = "✓" if has_subs else "✗"
-            status_color = "#2d7a2d" if has_subs else "#8b0000"
-
-            status_label = ctk.CTkLabel(frame, text=status_icon, width=20,
-                                       text_color=status_color, font=ctk.CTkFont(size=14, weight="bold"))
+            # Add subtitle status indicator with placeholder (load status in background)
+            status_label = ctk.CTkLabel(frame, text="○", width=20,
+                                       text_color="gray", font=ctk.CTkFont(size=14, weight="bold"))
             status_label.pack(side="left", padx=(0, 5))
 
             cb = ctk.CTkCheckBox(frame, text=f"{movie.title} ({movie.year})",
@@ -801,8 +799,31 @@ class MainAppFrame(ctk.CTkFrame):
             # Store frame for filtering
             self.top_level_frames.append(frame)
 
+            # Add to list for background loading
+            movie_frames.append(frame)
+
         # Trigger filter to ensure items are visible
         self.filter_items()
+
+        # Load subtitle status in background thread to avoid blocking UI
+        def load_subtitle_status():
+            if self._is_destroyed:
+                return
+            for frame in movie_frames:
+                if self._is_destroyed:
+                    return
+                try:
+                    item = frame.item_obj
+                    has_subs = self.check_has_subtitles(item)
+                    status_icon = "✓" if has_subs else "✗"
+                    status_color = "#2d7a2d" if has_subs else "#8b0000"
+                    # Update UI on main thread
+                    self.safe_after(0, lambda f=frame, i=status_icon, c=status_color:
+                                   f.status_label.configure(text=i, text_color=c))
+                except:
+                    pass
+
+        threading.Thread(target=load_subtitle_status, daemon=True).start()
 
     def populate_shows(self, shows):
         """Populate browser with shows (expandable)."""
@@ -975,6 +996,8 @@ class MainAppFrame(ctk.CTkFrame):
         if not hasattr(season_frame, 'episode_vars'):
             season_frame.episode_vars = []
 
+        episode_frames = []  # Collect frames for background status loading
+
         for episode in episodes:
             episode_var = ctk.BooleanVar()
 
@@ -982,13 +1005,9 @@ class MainAppFrame(ctk.CTkFrame):
             ep_frame = ctk.CTkFrame(episode_container, fg_color="transparent")
             ep_frame.pack(fill="x", pady=1)
 
-            # Add subtitle status indicator
-            has_subs = self.check_has_subtitles(episode)
-            status_icon = "✓" if has_subs else "✗"
-            status_color = "#2d7a2d" if has_subs else "#8b0000"
-
-            status_label = ctk.CTkLabel(ep_frame, text=status_icon, width=20,
-                                       text_color=status_color, font=ctk.CTkFont(size=12, weight="bold"))
+            # Add subtitle status indicator with placeholder (load status in background)
+            status_label = ctk.CTkLabel(ep_frame, text="○", width=20,
+                                       text_color="gray", font=ctk.CTkFont(size=12, weight="bold"))
             status_label.pack(side="left", padx=(5, 5))
 
             ep_cb = ctk.CTkCheckBox(ep_frame,
@@ -1004,6 +1023,29 @@ class MainAppFrame(ctk.CTkFrame):
             # Store references to checkbox and variable
             season_frame.episode_checkboxes.append(ep_cb)
             season_frame.episode_vars.append(episode_var)
+
+            # Add to list for background loading
+            episode_frames.append(ep_frame)
+
+        # Load subtitle status in background thread to avoid blocking UI
+        def load_subtitle_status():
+            if self._is_destroyed:
+                return
+            for frame in episode_frames:
+                if self._is_destroyed:
+                    return
+                try:
+                    item = frame.item_obj
+                    has_subs = self.check_has_subtitles(item)
+                    status_icon = "✓" if has_subs else "✗"
+                    status_color = "#2d7a2d" if has_subs else "#8b0000"
+                    # Update UI on main thread
+                    self.safe_after(0, lambda f=frame, i=status_icon, c=status_color:
+                                   f.status_label.configure(text=i, text_color=c))
+                except:
+                    pass
+
+        threading.Thread(target=load_subtitle_status, daemon=True).start()
 
     def on_item_selected(self, item, var):
         """Handle individual item (movie/episode) selection."""
@@ -1175,7 +1217,6 @@ class MainAppFrame(ctk.CTkFrame):
         self.search_btn.configure(state=state)
         self.list_btn.configure(state=state)
         self.set_btn.configure(state=state)
-        self.disable_btn.configure(state=state)
 
         # Download button only enabled if we have search results
         download_state = "normal" if self.search_results else "disabled"
