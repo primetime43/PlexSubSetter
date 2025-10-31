@@ -237,7 +237,8 @@ class ServerSelectionFrame(ctk.CTkFrame):
 
                         # Status and presence
                         status = "🟢 Online" if res.presence else "🔴 Offline"
-                        status_label = ctk.CTkLabel(card, text=status, anchor="w", text_color="gray")
+                        status_color = "#2ecc71" if res.presence else "#e74c3c"  # Green if online, red if offline
+                        status_label = ctk.CTkLabel(card, text=status, anchor="w", text_color=status_color)
                         status_label.grid(row=1, column=0, sticky="w", padx=15, pady=(0, 5))
 
                         # Platform info
