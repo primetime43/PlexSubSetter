@@ -237,7 +237,8 @@ class ServerSelectionFrame(ctk.CTkFrame):
         title.grid(row=0, column=0, sticky="w")
 
         logout_btn = ctk.CTkButton(header_frame, text="Logout", command=on_logout,
-                                   width=100, fg_color="transparent", border_width=2)
+                                   width=100, fg_color="transparent", border_width=2,
+                                   text_color=("gray10", "gray90"))
         logout_btn.grid(row=0, column=1, sticky="e")
 
         # Subtitle
@@ -442,7 +443,8 @@ class MainAppFrame(ctk.CTkFrame):
 
         clear_search_btn = ctk.CTkButton(search_frame, text="✕", width=32, height=32,
                                         command=self.clear_search,
-                                        fg_color="transparent", hover_color="#404040")
+                                        fg_color="transparent", hover_color=("gray80", "#404040"),
+                                        text_color=("gray10", "gray90"))
         clear_search_btn.grid(row=0, column=1)
 
         # Subtitle status filter buttons (for movies only)
@@ -457,19 +459,21 @@ class MainAppFrame(ctk.CTkFrame):
 
         self.filter_all_btn = ctk.CTkButton(self.filter_btn_frame, text="All",
                                            command=lambda: self.set_subtitle_filter("all"),
-                                           height=24, fg_color="#1f538d", hover_color="#1a4472")
+                                           height=24)
         self.filter_all_btn.grid(row=1, column=0, padx=(0, 3), sticky="ew")
 
         self.filter_missing_btn = ctk.CTkButton(self.filter_btn_frame, text="Missing",
                                                command=lambda: self.set_subtitle_filter("missing"),
                                                height=24, fg_color="transparent", border_width=1,
-                                               border_color="gray50")
+                                               border_color=("gray60", "gray40"),
+                                               text_color=("gray10", "gray90"))
         self.filter_missing_btn.grid(row=1, column=1, padx=(0, 3), sticky="ew")
 
         self.filter_has_btn = ctk.CTkButton(self.filter_btn_frame, text="Has Subs",
                                            command=lambda: self.set_subtitle_filter("has"),
                                            height=24, fg_color="transparent", border_width=1,
-                                           border_color="gray50")
+                                           border_color=("gray60", "gray40"),
+                                           text_color=("gray10", "gray90"))
         self.filter_has_btn.grid(row=1, column=2, sticky="ew")
 
         # Hide filter buttons by default (will show for movies only)
@@ -507,12 +511,14 @@ class MainAppFrame(ctk.CTkFrame):
 
         self.select_all_btn = ctk.CTkButton(btn_frame, text="Select All", height=24,
                                            command=self.select_all_items,
-                                           fg_color="transparent", border_width=1)
+                                           fg_color="transparent", border_width=1,
+                                           text_color=("gray10", "gray90"))
         self.select_all_btn.grid(row=0, column=0, padx=(0, 5), sticky="ew")
 
         self.clear_selection_btn = ctk.CTkButton(btn_frame, text="Clear", height=24,
                                                 command=self.clear_selection,
-                                                fg_color="transparent", border_width=1)
+                                                fg_color="transparent", border_width=1,
+                                                text_color=("gray10", "gray90"))
         self.clear_selection_btn.grid(row=0, column=1, sticky="ew")
 
         # === RIGHT PANEL: CONTROLS AND LOG ===
@@ -532,11 +538,13 @@ class MainAppFrame(ctk.CTkFrame):
         title.grid(row=0, column=0, sticky="w", padx=15, pady=15)
 
         settings_btn = ctk.CTkButton(header_frame, text="⚙ Settings", command=self.open_settings,
-                                    width=100, fg_color="transparent", border_width=2)
+                                    width=100, fg_color="transparent", border_width=2,
+                                    text_color=("gray10", "gray90"))
         settings_btn.grid(row=0, column=1, padx=(15, 5), pady=15)
 
         logout_btn = ctk.CTkButton(header_frame, text="Change Server", command=self.on_logout,
-                                   width=120, fg_color="transparent", border_width=2)
+                                   width=120, fg_color="transparent", border_width=2,
+                                   text_color=("gray10", "gray90"))
         logout_btn.grid(row=0, column=2, padx=(5, 15), pady=15)
 
         # === SUBTITLE OPTIONS ===
@@ -595,26 +603,26 @@ class MainAppFrame(ctk.CTkFrame):
 
         self.download_btn = ctk.CTkButton(actions_frame, text="⬇ Download Selected",
                                          command=self.download_subtitles, height=40,
-                                         fg_color="#1f538d", hover_color="#1a4472",
                                          state="disabled")
         self.download_btn.grid(row=0, column=1, padx=5, pady=15, sticky="ew")
 
         self.list_btn = ctk.CTkButton(actions_frame, text="📋 List Current",
                                      command=self.list_subtitles, height=40,
-                                     fg_color="#6b4f9d", hover_color="#553d7d",
                                      state="disabled")
         self.list_btn.grid(row=0, column=2, padx=5, pady=15, sticky="ew")
 
         # Second row for dry run and delete buttons
         self.dry_run_btn = ctk.CTkButton(actions_frame, text="👁 Dry Run (Preview Missing)",
                                         command=self.dry_run_missing_subtitles, height=40,
-                                        fg_color="#2d7a2d", hover_color="#236123",
+                                        fg_color=("green", "#2d7a2d"),
+                                        hover_color=("darkgreen", "#236123"),
                                         state="disabled")
         self.dry_run_btn.grid(row=1, column=0, columnspan=2, padx=5, pady=(0, 15), sticky="ew")
 
         self.delete_subs_btn = ctk.CTkButton(actions_frame, text="🗑 Delete",
                                              command=self.delete_subtitles, height=40,
-                                             fg_color="#8b0000", hover_color="#6b0000",
+                                             fg_color=("red", "#8b0000"),
+                                             hover_color=("darkred", "#6b0000"),
                                              state="disabled")
         self.delete_subs_btn.grid(row=1, column=2, padx=5, pady=(0, 15), sticky="ew")
 
@@ -670,7 +678,8 @@ class MainAppFrame(ctk.CTkFrame):
 
         self.log_toggle_btn = ctk.CTkButton(log_header, text="▼ Log", command=self.toggle_log,
                                            width=80, height=24, fg_color="transparent",
-                                           border_width=1, anchor="w")
+                                           border_width=1, anchor="w",
+                                           text_color=("gray10", "gray90"))
         self.log_toggle_btn.grid(row=0, column=0, sticky="w")
 
         # Log file path label
@@ -679,7 +688,8 @@ class MainAppFrame(ctk.CTkFrame):
         log_file_label.grid(row=0, column=1, sticky="w", padx=10)
 
         clear_btn = ctk.CTkButton(log_header, text="Clear", command=self.clear_log,
-                                 width=60, height=24, fg_color="transparent")
+                                 width=60, height=24, fg_color="transparent",
+                                 text_color=("gray10", "gray90"))
         clear_btn.grid(row=0, column=2, sticky="e")
 
         # Text widget with proper wrapping (smaller)
@@ -816,17 +826,17 @@ class MainAppFrame(ctk.CTkFrame):
 
         # Update button appearances to show active filter
         if filter_type == "all":
-            self.filter_all_btn.configure(fg_color="#1f538d", border_width=0)
+            self.filter_all_btn.configure(fg_color=("blue", "#1f538d"), border_width=0)
             self.filter_missing_btn.configure(fg_color="transparent", border_width=1)
             self.filter_has_btn.configure(fg_color="transparent", border_width=1)
         elif filter_type == "missing":
             self.filter_all_btn.configure(fg_color="transparent", border_width=1)
-            self.filter_missing_btn.configure(fg_color="#8b0000", border_width=0)
+            self.filter_missing_btn.configure(fg_color=("red", "#8b0000"), border_width=0)
             self.filter_has_btn.configure(fg_color="transparent", border_width=1)
         elif filter_type == "has":
             self.filter_all_btn.configure(fg_color="transparent", border_width=1)
             self.filter_missing_btn.configure(fg_color="transparent", border_width=1)
-            self.filter_has_btn.configure(fg_color="#2d7a2d", border_width=0)
+            self.filter_has_btn.configure(fg_color=("green", "#2d7a2d"), border_width=0)
 
         # Reapply filter
         self.filter_items()
@@ -1111,7 +1121,7 @@ class MainAppFrame(ctk.CTkFrame):
                             item = frame.item_obj
                             has_subs = self.check_has_subtitles(item)
                             status_icon = "✓" if has_subs else "✗"
-                            status_color = "#2d7a2d" if has_subs else "#8b0000"
+                            status_color = ("green", "#2d7a2d") if has_subs else ("red", "#8b0000")
 
                             def update_status_label(frame_ref=frame, icon=status_icon, color=status_color):
                                 try:
@@ -1201,6 +1211,7 @@ class MainAppFrame(ctk.CTkFrame):
 
                 expand_btn = ctk.CTkButton(show_inner, text="▶", width=30, height=24,
                                            fg_color="transparent",
+                                           text_color=("gray10", "gray90"),
                                            command=lambda s=show, f=show_frame, v=expand_var: self.toggle_show(s, f, v))
                 expand_btn.pack(side="left", padx=(0, 5))
 
@@ -1438,7 +1449,8 @@ class MainAppFrame(ctk.CTkFrame):
                                          width=60, height=24,
                                          command=lambda: load_episode_page(page_num - 1),
                                          state="normal" if page_num > 1 else "disabled",
-                                         fg_color="transparent", border_width=1)
+                                         fg_color="transparent", border_width=1,
+                                         text_color=("gray10", "gray90"))
                 prev_btn.pack(side="left", padx=2)
 
                 page_label = ctk.CTkLabel(pagination_frame,
@@ -1450,7 +1462,8 @@ class MainAppFrame(ctk.CTkFrame):
                                          width=60, height=24,
                                          command=lambda: load_episode_page(page_num + 1),
                                          state="normal" if page_num < total_pages else "disabled",
-                                         fg_color="transparent", border_width=1)
+                                         fg_color="transparent", border_width=1,
+                                         text_color=("gray10", "gray90"))
                 next_btn.pack(side="right", padx=2)
 
             # Load subtitle status in background
@@ -1465,7 +1478,7 @@ class MainAppFrame(ctk.CTkFrame):
                             item = frame.item_obj
                             has_subs = self.check_has_subtitles(item)
                             status_icon = "✓" if has_subs else "✗"
-                            status_color = "#2d7a2d" if has_subs else "#8b0000"
+                            status_color = ("green", "#2d7a2d") if has_subs else ("red", "#8b0000")
 
                             def update_status_label(frame_ref=frame, icon=status_icon, color=status_color):
                                 try:
@@ -1784,7 +1797,7 @@ class MainAppFrame(ctk.CTkFrame):
 
                 # Update indicator
                 status_icon = "✓" if has_subs else "✗"
-                status_color = "#2d7a2d" if has_subs else "#8b0000"
+                status_color = ("green", "#2d7a2d") if has_subs else ("red", "#8b0000")
                 frame.status_label.configure(text=status_icon, text_color=status_color)
             except:
                 pass
@@ -2300,7 +2313,7 @@ class MainAppFrame(ctk.CTkFrame):
                 items_with_subs += 1
                 # Title with checkmark
                 title_label = ctk.CTkLabel(item_frame, text=f"✓ {title}",
-                                          font=ctk.CTkFont(weight="bold"), text_color="#2d7a2d",
+                                          font=ctk.CTkFont(weight="bold"), text_color=("green", "#2d7a2d"),
                                           anchor="w")
                 title_label.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
 
@@ -2313,7 +2326,7 @@ class MainAppFrame(ctk.CTkFrame):
                 items_without_subs += 1
                 # Title with X
                 title_label = ctk.CTkLabel(item_frame, text=f"✗ {title}",
-                                          font=ctk.CTkFont(weight="bold"), text_color="#8b0000",
+                                          font=ctk.CTkFont(weight="bold"), text_color=("red", "#8b0000"),
                                           anchor="w")
                 title_label.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
 
@@ -2424,7 +2437,7 @@ class MainAppFrame(ctk.CTkFrame):
                                                 pass
 
                                         sub_text = f"{selected} {language} ({codec}){forced}{sdh}{sub_detail}"
-                                        text_color = "#2d7a2d" if sub.selected else "gray"
+                                        text_color = ("green", "#2d7a2d") if sub.selected else ("gray60", "gray")
 
                                         ctk.CTkLabel(item_frame, text=sub_text,
                                                     font=ctk.CTkFont(size=11), text_color=text_color,
@@ -2433,7 +2446,7 @@ class MainAppFrame(ctk.CTkFrame):
 
                         if not has_subs:
                             ctk.CTkLabel(item_frame, text="✗ No subtitles available",
-                                        font=ctk.CTkFont(size=11), text_color="#8b0000",
+                                        font=ctk.CTkFont(size=11), text_color=("red", "#8b0000"),
                                         anchor="w").grid(row=2, column=0, sticky="w", padx=20, pady=5)
                         else:
                             # Add padding
@@ -2441,7 +2454,7 @@ class MainAppFrame(ctk.CTkFrame):
 
                     except Exception as e:
                         ctk.CTkLabel(item_frame, text=f"✗ Error: {e}",
-                                    font=ctk.CTkFont(size=11), text_color="#8b0000",
+                                    font=ctk.CTkFont(size=11), text_color=("red", "#8b0000"),
                                     anchor="w").grid(row=2, column=0, sticky="w", padx=20, pady=5)
 
                 self.safe_after(0, create_item_frame)
@@ -2606,8 +2619,37 @@ class MainAppFrame(ctk.CTkFrame):
         config = configparser.ConfigParser()
         config.read('config.ini')
 
-        # Subtitle save method: 'plex' or 'file'
-        self.subtitle_save_method = config.get('Settings', 'subtitle_save_method', fallback='plex')
+        # === General Settings ===
+        self.subtitle_save_method = config.get('General', 'subtitle_save_method', fallback='plex')
+        self.default_language = config.get('General', 'default_language', fallback='English')
+        self.appearance_mode = config.get('General', 'appearance_mode', fallback='dark')
+        self.remember_last_library = config.getboolean('General', 'remember_last_library', fallback=True)
+        self.last_library = config.get('General', 'last_library', fallback='')
+
+        # === Subtitle Settings ===
+        self.prefer_hearing_impaired = config.getboolean('Subtitles', 'prefer_hearing_impaired', fallback=False)
+        self.prefer_forced = config.getboolean('Subtitles', 'prefer_forced', fallback=False)
+        self.default_providers = config.get('Subtitles', 'default_providers', fallback='opensubtitles,podnapisi')
+        self.search_timeout = config.getint('Subtitles', 'search_timeout', fallback=30)
+
+        # === UI Settings ===
+        self.show_log_on_startup = config.getboolean('UI', 'show_log_on_startup', fallback=False)
+        self.default_subtitle_filter = config.get('UI', 'default_subtitle_filter', fallback='all')
+        self.confirm_batch_operations = config.getboolean('UI', 'confirm_batch_operations', fallback=True)
+        self.batch_operation_threshold = config.getint('UI', 'batch_operation_threshold', fallback=10)
+
+        # === Advanced Settings ===
+        self.concurrent_downloads = config.getint('Advanced', 'concurrent_downloads', fallback=3)
+        self.enable_debug_logging = config.getboolean('Advanced', 'enable_debug_logging', fallback=False)
+
+        # Apply settings
+        ctk.set_appearance_mode(self.appearance_mode)
+
+        # Set logging level based on debug setting
+        if self.enable_debug_logging:
+            logging.getLogger().setLevel(logging.DEBUG)
+        else:
+            logging.getLogger().setLevel(logging.INFO)
 
     def save_settings(self):
         """Save application settings."""
@@ -2616,30 +2658,61 @@ class MainAppFrame(ctk.CTkFrame):
         # Read existing config to preserve other sections
         config.read('config.ini')
 
-        # Create Settings section if it doesn't exist
-        if not config.has_section('Settings'):
-            config.add_section('Settings')
+        # === General Settings ===
+        if not config.has_section('General'):
+            config.add_section('General')
+        config.set('General', 'subtitle_save_method', self.subtitle_save_method)
+        config.set('General', 'default_language', self.default_language)
+        config.set('General', 'appearance_mode', self.appearance_mode)
+        config.set('General', 'remember_last_library', str(self.remember_last_library))
+        config.set('General', 'last_library', self.last_library if hasattr(self, 'last_library') else '')
 
-        # Save subtitle save method
-        config.set('Settings', 'subtitle_save_method', self.subtitle_save_method)
+        # === Subtitle Settings ===
+        if not config.has_section('Subtitles'):
+            config.add_section('Subtitles')
+        config.set('Subtitles', 'prefer_hearing_impaired', str(self.prefer_hearing_impaired))
+        config.set('Subtitles', 'prefer_forced', str(self.prefer_forced))
+        config.set('Subtitles', 'default_providers', self.default_providers)
+        config.set('Subtitles', 'search_timeout', str(self.search_timeout))
+
+        # === UI Settings ===
+        if not config.has_section('UI'):
+            config.add_section('UI')
+        config.set('UI', 'show_log_on_startup', str(self.show_log_on_startup))
+        config.set('UI', 'default_subtitle_filter', self.default_subtitle_filter)
+        config.set('UI', 'confirm_batch_operations', str(self.confirm_batch_operations))
+        config.set('UI', 'batch_operation_threshold', str(self.batch_operation_threshold))
+
+        # === Advanced Settings ===
+        if not config.has_section('Advanced'):
+            config.add_section('Advanced')
+        config.set('Advanced', 'concurrent_downloads', str(self.concurrent_downloads))
+        config.set('Advanced', 'enable_debug_logging', str(self.enable_debug_logging))
 
         # Write to file
         with open('config.ini', 'w') as f:
             config.write(f)
 
+        # Apply runtime settings changes
+        ctk.set_appearance_mode(self.appearance_mode)
+        if self.enable_debug_logging:
+            logging.getLogger().setLevel(logging.DEBUG)
+        else:
+            logging.getLogger().setLevel(logging.INFO)
+
     def open_settings(self):
-        """Open settings dialog."""
+        """Open comprehensive settings dialog with tabs."""
         settings_window = ctk.CTkToplevel(self)
-        settings_window.title("Settings")
-        settings_window.geometry("650x500")
+        settings_window.title("PlexSubSetter Settings")
+        settings_window.geometry("800x650")
         settings_window.transient(self)
         settings_window.grab_set()
 
         # Center window
         settings_window.update_idletasks()
-        x = (settings_window.winfo_screenwidth() // 2) - (650 // 2)
-        y = (settings_window.winfo_screenheight() // 2) - (500 // 2)
-        settings_window.geometry(f"650x500+{x}+{y}")
+        x = (settings_window.winfo_screenwidth() // 2) - (800 // 2)
+        y = (settings_window.winfo_screenheight() // 2) - (650 // 2)
+        settings_window.geometry(f"800x650+{x}+{y}")
 
         # Main container
         main_frame = ctk.CTkFrame(settings_window)
@@ -2647,104 +2720,284 @@ class MainAppFrame(ctk.CTkFrame):
 
         # Title
         ctk.CTkLabel(main_frame, text="⚙ Settings",
-                    font=ctk.CTkFont(size=24, weight="bold")).pack(anchor="w", pady=(0, 20))
+                    font=ctk.CTkFont(size=24, weight="bold")).pack(anchor="w", pady=(0, 15))
 
-        # === SUBTITLE SAVE METHOD ===
-        save_method_frame = ctk.CTkFrame(main_frame, fg_color=("gray85", "gray25"))
-        save_method_frame.pack(fill="x", pady=(0, 15))
-        save_method_frame.grid_columnconfigure(0, weight=1)
+        # Create tabview
+        tabview = ctk.CTkTabview(main_frame)
+        tabview.pack(fill="both", expand=True, pady=(0, 15))
 
-        ctk.CTkLabel(save_method_frame, text="Subtitle Save Method",
-                    font=ctk.CTkFont(size=16, weight="bold")).grid(
-            row=0, column=0, sticky="w", padx=15, pady=(15, 5))
+        # Create tabs
+        general_tab = tabview.add("General")
+        subtitles_tab = tabview.add("Subtitles")
+        ui_tab = tabview.add("UI/Behavior")
+        advanced_tab = tabview.add("Advanced")
 
-        # Radio buttons for save method
-        save_method_var = ctk.StringVar(value=self.subtitle_save_method)
+        # Store settings in variables
+        settings_vars = {}
 
-        # Option 1: Upload to Plex
-        plex_radio = ctk.CTkRadioButton(
-            save_method_frame,
-            text="Upload to Plex (Default)",
-            variable=save_method_var,
-            value="plex"
-        )
-        plex_radio.grid(row=1, column=0, sticky="w", padx=20, pady=(10, 5))
+        # ==================== GENERAL TAB ====================
+        general_scroll = ctk.CTkScrollableFrame(general_tab)
+        general_scroll.pack(fill="both", expand=True, padx=10, pady=10)
 
-        plex_desc = ctk.CTkLabel(
-            save_method_frame,
-            text="• Subtitles are uploaded to Plex's internal database\n"
-                 "• Works with remote Plex servers (no file access needed)\n"
-                 "• Subtitles survive even if video files move\n"
-                 "• Subtitles stored in Plex's Metadata directory",
-            font=ctk.CTkFont(size=11),
-            text_color="gray",
-            justify="left"
-        )
-        plex_desc.grid(row=2, column=0, sticky="w", padx=40, pady=(0, 10))
+        # Default Language
+        ctk.CTkLabel(general_scroll, text="Default Subtitle Language",
+                    font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", pady=(5, 5))
+        settings_vars['default_language'] = ctk.StringVar(value=self.default_language)
+        lang_combo = ctk.CTkComboBox(general_scroll, values=list(SEARCH_LANGUAGES.keys()),
+                                     variable=settings_vars['default_language'], state="readonly")
+        lang_combo.pack(fill="x", pady=(0, 5))
+        ctk.CTkLabel(general_scroll, text="Language used when searching for subtitles",
+                    font=ctk.CTkFont(size=11), text_color="gray").pack(anchor="w", pady=(0, 15))
 
-        # Show Plex metadata path
-        try:
-            if sys.platform.startswith('win'):
-                plex_path = os.path.expandvars("%LOCALAPPDATA%\\Plex Media Server\\Media\\localhost")
-            elif sys.platform == 'darwin':
-                plex_path = os.path.expanduser("~/Library/Application Support/Plex Media Server/Media/localhost")
-            else:
-                plex_path = "/var/lib/plexmediaserver/Library/Application Support/Plex Media Server/Media/localhost"
+        # Appearance Mode
+        ctk.CTkLabel(general_scroll, text="Appearance Theme",
+                    font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", pady=(5, 5))
+        settings_vars['appearance_mode'] = ctk.StringVar(value=self.appearance_mode)
+        appearance_frame = ctk.CTkFrame(general_scroll, fg_color="transparent")
+        appearance_frame.pack(fill="x", pady=(0, 5))
+        for mode in ["dark", "light", "system"]:
+            ctk.CTkRadioButton(appearance_frame, text=mode.capitalize(),
+                              variable=settings_vars['appearance_mode'],
+                              value=mode).pack(side="left", padx=(0, 20))
+        ctk.CTkLabel(general_scroll, text="Choose the color theme for the application",
+                    font=ctk.CTkFont(size=11), text_color="gray").pack(anchor="w", pady=(0, 15))
 
-            plex_path_label = ctk.CTkLabel(
-                save_method_frame,
-                text=f"  Path: {plex_path}",
-                font=ctk.CTkFont(size=10, family="Courier"),
-                text_color="#e5a00d"
-            )
-            plex_path_label.grid(row=3, column=0, sticky="w", padx=40, pady=(0, 15))
-        except:
-            pass
+        # Remember Last Library
+        settings_vars['remember_last_library'] = ctk.BooleanVar(value=self.remember_last_library)
+        ctk.CTkCheckBox(general_scroll, text="Remember last selected library",
+                       variable=settings_vars['remember_last_library']).pack(anchor="w", pady=(5, 5))
+        ctk.CTkLabel(general_scroll, text="Automatically select the last used library when opening the app",
+                    font=ctk.CTkFont(size=11), text_color="gray").pack(anchor="w", pady=(0, 15))
 
-        # Option 2: Save next to video file
-        file_radio = ctk.CTkRadioButton(
-            save_method_frame,
-            text="Save next to video file",
-            variable=save_method_var,
-            value="file"
-        )
-        file_radio.grid(row=4, column=0, sticky="w", padx=20, pady=(5, 5))
+        # ==================== SUBTITLES TAB ====================
+        subtitles_scroll = ctk.CTkScrollableFrame(subtitles_tab)
+        subtitles_scroll.pack(fill="both", expand=True, padx=10, pady=10)
 
-        file_desc = ctk.CTkLabel(
-            save_method_frame,
-            text="• Subtitles saved in same directory as video files\n"
-                 "• Standard naming: VideoName.en.srt, VideoName.es.srt, etc.\n"
-                 "• Plex will auto-detect subtitles on next scan",
-            font=ctk.CTkFont(size=11),
-            text_color="gray",
-            justify="left"
-        )
-        file_desc.grid(row=5, column=0, sticky="w", padx=40, pady=(0, 5))
+        # Subtitle Save Method
+        ctk.CTkLabel(subtitles_scroll, text="Subtitle Save Method",
+                    font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", pady=(5, 5))
+        settings_vars['subtitle_save_method'] = ctk.StringVar(value=self.subtitle_save_method)
 
-        # Warning note about network requirement
-        file_warning = ctk.CTkLabel(
-            save_method_frame,
-            text="⚠ Note: Only works with local Plex servers or network-accessible file systems.\n"
-                 "   Will not work with remote Plex servers accessed over the internet.",
-            font=ctk.CTkFont(size=10),
-            text_color="#e5a00d",
-            justify="left"
-        )
-        file_warning.grid(row=6, column=0, sticky="w", padx=40, pady=(0, 15))
+        save_method_frame = ctk.CTkFrame(subtitles_scroll, fg_color=("gray85", "gray20"))
+        save_method_frame.pack(fill="x", pady=(0, 5))
 
-        # === SAVE BUTTON ===
+        ctk.CTkRadioButton(save_method_frame, text="Upload to Plex (Recommended)",
+                          variable=settings_vars['subtitle_save_method'],
+                          value="plex").pack(anchor="w", padx=15, pady=(10, 5))
+        ctk.CTkLabel(save_method_frame,
+                    text="  • Subtitles uploaded to Plex's internal database\n"
+                         "  • Works with remote servers\n"
+                         "  • Subtitles survive if video files move",
+                    font=ctk.CTkFont(size=11), text_color="gray",
+                    justify="left").pack(anchor="w", padx=30, pady=(0, 10))
+
+        ctk.CTkRadioButton(save_method_frame, text="Save next to video file",
+                          variable=settings_vars['subtitle_save_method'],
+                          value="file").pack(anchor="w", padx=15, pady=(5, 5))
+        ctk.CTkLabel(save_method_frame,
+                    text="  • Subtitles saved alongside video files\n"
+                         "  • Requires local or network file access\n"
+                         "  • Plex auto-detects on next scan",
+                    font=ctk.CTkFont(size=11), text_color="gray",
+                    justify="left").pack(anchor="w", padx=30, pady=(0, 10))
+
+        # Subtitle Preferences
+        ctk.CTkLabel(subtitles_scroll, text="Subtitle Preferences",
+                    font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", pady=(15, 5))
+
+        settings_vars['prefer_hearing_impaired'] = ctk.BooleanVar(value=self.prefer_hearing_impaired)
+        ctk.CTkCheckBox(subtitles_scroll, text="Prefer hearing impaired (SDH) subtitles",
+                       variable=settings_vars['prefer_hearing_impaired']).pack(anchor="w", pady=(5, 2))
+        ctk.CTkLabel(subtitles_scroll, text="Prioritize subtitles with sound descriptions",
+                    font=ctk.CTkFont(size=11), text_color="gray").pack(anchor="w", padx=25, pady=(0, 10))
+
+        settings_vars['prefer_forced'] = ctk.BooleanVar(value=self.prefer_forced)
+        ctk.CTkCheckBox(subtitles_scroll, text="Prefer forced subtitles",
+                       variable=settings_vars['prefer_forced']).pack(anchor="w", pady=(5, 2))
+        ctk.CTkLabel(subtitles_scroll, text="Subtitles only for foreign language parts",
+                    font=ctk.CTkFont(size=11), text_color="gray").pack(anchor="w", padx=25, pady=(0, 15))
+
+        # Default Providers
+        ctk.CTkLabel(subtitles_scroll, text="Default Subtitle Providers",
+                    font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", pady=(5, 5))
+        settings_vars['default_providers'] = ctk.StringVar(value=self.default_providers)
+        providers_entry = ctk.CTkEntry(subtitles_scroll, textvariable=settings_vars['default_providers'])
+        providers_entry.pack(fill="x", pady=(0, 5))
+        ctk.CTkLabel(subtitles_scroll,
+                    text="Comma-separated list: opensubtitles, podnapisi, tvsubtitles, addic7ed",
+                    font=ctk.CTkFont(size=11), text_color="gray").pack(anchor="w", pady=(0, 15))
+
+        # Search Timeout
+        ctk.CTkLabel(subtitles_scroll, text="Search Timeout (seconds)",
+                    font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", pady=(5, 5))
+        settings_vars['search_timeout'] = ctk.IntVar(value=self.search_timeout)
+        timeout_slider = ctk.CTkSlider(subtitles_scroll, from_=10, to=120,
+                                       variable=settings_vars['search_timeout'],
+                                       number_of_steps=22)
+        timeout_slider.pack(fill="x", pady=(0, 5))
+        timeout_label = ctk.CTkLabel(subtitles_scroll, text=f"{self.search_timeout} seconds")
+        timeout_label.pack(anchor="w", pady=(0, 5))
+
+        def update_timeout_label(*args):
+            timeout_label.configure(text=f"{settings_vars['search_timeout'].get()} seconds")
+        settings_vars['search_timeout'].trace_add("write", update_timeout_label)
+
+        ctk.CTkLabel(subtitles_scroll, text="Maximum time to wait for subtitle search results",
+                    font=ctk.CTkFont(size=11), text_color="gray").pack(anchor="w", pady=(0, 15))
+
+        # ==================== UI/BEHAVIOR TAB ====================
+        ui_scroll = ctk.CTkScrollableFrame(ui_tab)
+        ui_scroll.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Show Log on Startup
+        ctk.CTkLabel(ui_scroll, text="Startup Behavior",
+                    font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", pady=(5, 5))
+        settings_vars['show_log_on_startup'] = ctk.BooleanVar(value=self.show_log_on_startup)
+        ctk.CTkCheckBox(ui_scroll, text="Show log panel on startup",
+                       variable=settings_vars['show_log_on_startup']).pack(anchor="w", pady=(5, 2))
+        ctk.CTkLabel(ui_scroll, text="Display the activity log when the application starts",
+                    font=ctk.CTkFont(size=11), text_color="gray").pack(anchor="w", padx=25, pady=(0, 15))
+
+        # Default Subtitle Filter
+        ctk.CTkLabel(ui_scroll, text="Default Subtitle Filter",
+                    font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", pady=(5, 5))
+        settings_vars['default_subtitle_filter'] = ctk.StringVar(value=self.default_subtitle_filter)
+        filter_frame = ctk.CTkFrame(ui_scroll, fg_color="transparent")
+        filter_frame.pack(fill="x", pady=(0, 5))
+        for filter_opt in ["all", "missing", "has"]:
+            ctk.CTkRadioButton(filter_frame, text=filter_opt.capitalize(),
+                              variable=settings_vars['default_subtitle_filter'],
+                              value=filter_opt).pack(side="left", padx=(0, 15))
+        ctk.CTkLabel(ui_scroll, text="Default filter when viewing movie libraries",
+                    font=ctk.CTkFont(size=11), text_color="gray").pack(anchor="w", pady=(0, 15))
+
+        # Batch Operation Confirmations
+        ctk.CTkLabel(ui_scroll, text="Batch Operations",
+                    font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", pady=(5, 5))
+        settings_vars['confirm_batch_operations'] = ctk.BooleanVar(value=self.confirm_batch_operations)
+        ctk.CTkCheckBox(ui_scroll, text="Confirm before batch operations",
+                       variable=settings_vars['confirm_batch_operations']).pack(anchor="w", pady=(5, 2))
+        ctk.CTkLabel(ui_scroll, text="Show confirmation dialog before processing multiple items",
+                    font=ctk.CTkFont(size=11), text_color="gray").pack(anchor="w", padx=25, pady=(0, 10))
+
+        # Batch Operation Threshold
+        ctk.CTkLabel(ui_scroll, text="Batch operation threshold:",
+                    font=ctk.CTkFont(size=12)).pack(anchor="w", pady=(5, 5))
+        settings_vars['batch_operation_threshold'] = ctk.IntVar(value=self.batch_operation_threshold)
+        threshold_slider = ctk.CTkSlider(ui_scroll, from_=5, to=50,
+                                        variable=settings_vars['batch_operation_threshold'],
+                                        number_of_steps=9)
+        threshold_slider.pack(fill="x", pady=(0, 5))
+        threshold_label = ctk.CTkLabel(ui_scroll, text=f"{self.batch_operation_threshold} items")
+        threshold_label.pack(anchor="w", pady=(0, 5))
+
+        def update_threshold_label(*args):
+            threshold_label.configure(text=f"{settings_vars['batch_operation_threshold'].get()} items")
+        settings_vars['batch_operation_threshold'].trace_add("write", update_threshold_label)
+
+        ctk.CTkLabel(ui_scroll, text="Show warning when operating on this many items or more",
+                    font=ctk.CTkFont(size=11), text_color="gray").pack(anchor="w", pady=(0, 15))
+
+        # ==================== ADVANCED TAB ====================
+        advanced_scroll = ctk.CTkScrollableFrame(advanced_tab)
+        advanced_scroll.pack(fill="both", expand=True, padx=10, pady=10)
+
+        ctk.CTkLabel(advanced_scroll, text="⚠ Advanced Settings",
+                    font=ctk.CTkFont(size=16, weight="bold"),
+                    text_color="#e5a00d").pack(anchor="w", pady=(5, 5))
+        ctk.CTkLabel(advanced_scroll, text="Modify these settings only if you know what you're doing",
+                    font=ctk.CTkFont(size=11), text_color="gray").pack(anchor="w", pady=(0, 15))
+
+        # Concurrent Downloads
+        ctk.CTkLabel(advanced_scroll, text="Concurrent Downloads",
+                    font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", pady=(5, 5))
+        settings_vars['concurrent_downloads'] = ctk.IntVar(value=self.concurrent_downloads)
+        concurrent_slider = ctk.CTkSlider(advanced_scroll, from_=1, to=10,
+                                         variable=settings_vars['concurrent_downloads'],
+                                         number_of_steps=9)
+        concurrent_slider.pack(fill="x", pady=(0, 5))
+        concurrent_label = ctk.CTkLabel(advanced_scroll, text=f"{self.concurrent_downloads} downloads")
+        concurrent_label.pack(anchor="w", pady=(0, 5))
+
+        def update_concurrent_label(*args):
+            concurrent_label.configure(text=f"{settings_vars['concurrent_downloads'].get()} downloads")
+        settings_vars['concurrent_downloads'].trace_add("write", update_concurrent_label)
+
+        ctk.CTkLabel(advanced_scroll, text="Maximum number of simultaneous subtitle downloads",
+                    font=ctk.CTkFont(size=11), text_color="gray").pack(anchor="w", pady=(0, 15))
+
+        # Debug Logging
+        settings_vars['enable_debug_logging'] = ctk.BooleanVar(value=self.enable_debug_logging)
+        ctk.CTkCheckBox(advanced_scroll, text="Enable debug logging",
+                       variable=settings_vars['enable_debug_logging']).pack(anchor="w", pady=(5, 2))
+        ctk.CTkLabel(advanced_scroll, text="Write detailed debug information to log files (increases log size)",
+                    font=ctk.CTkFont(size=11), text_color="gray").pack(anchor="w", padx=25, pady=(0, 15))
+
+        # Log file location
+        ctk.CTkLabel(advanced_scroll, text="Current log file:",
+                    font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w", pady=(10, 5))
+        log_path_frame = ctk.CTkFrame(advanced_scroll, fg_color=("gray85", "gray20"))
+        log_path_frame.pack(fill="x", pady=(0, 5))
+        ctk.CTkLabel(log_path_frame, text=current_log_file,
+                    font=ctk.CTkFont(size=10, family="Courier"),
+                    text_color="gray").pack(anchor="w", padx=10, pady=10)
+
+        # ==================== BUTTONS ====================
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame.pack(fill="x", pady=(10, 0))
+
         def save_and_close():
-            self.subtitle_save_method = save_method_var.get()
+            # Apply all settings from variables
+            self.subtitle_save_method = settings_vars['subtitle_save_method'].get()
+            self.default_language = settings_vars['default_language'].get()
+            self.appearance_mode = settings_vars['appearance_mode'].get()
+            self.remember_last_library = settings_vars['remember_last_library'].get()
+            self.prefer_hearing_impaired = settings_vars['prefer_hearing_impaired'].get()
+            self.prefer_forced = settings_vars['prefer_forced'].get()
+            self.default_providers = settings_vars['default_providers'].get()
+            self.search_timeout = settings_vars['search_timeout'].get()
+            self.show_log_on_startup = settings_vars['show_log_on_startup'].get()
+            self.default_subtitle_filter = settings_vars['default_subtitle_filter'].get()
+            self.confirm_batch_operations = settings_vars['confirm_batch_operations'].get()
+            self.batch_operation_threshold = settings_vars['batch_operation_threshold'].get()
+            self.concurrent_downloads = settings_vars['concurrent_downloads'].get()
+            self.enable_debug_logging = settings_vars['enable_debug_logging'].get()
+
+            # Save to config file
             self.save_settings()
-            self.update_status(f"Settings saved - Using {self.subtitle_save_method} save method")
+
+            self.update_status("Settings saved successfully")
+            self.log("Settings saved and applied", "info")
             settings_window.destroy()
 
-        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        button_frame.pack(fill="x", pady=(20, 0))
+        def reset_to_defaults():
+            if messagebox.askyesno("Reset Settings", "Reset all settings to default values?", parent=settings_window):
+                settings_vars['subtitle_save_method'].set('plex')
+                settings_vars['default_language'].set('English')
+                settings_vars['appearance_mode'].set('dark')
+                settings_vars['remember_last_library'].set(True)
+                settings_vars['prefer_hearing_impaired'].set(False)
+                settings_vars['prefer_forced'].set(False)
+                settings_vars['default_providers'].set('opensubtitles,podnapisi')
+                settings_vars['search_timeout'].set(30)
+                settings_vars['show_log_on_startup'].set(False)
+                settings_vars['default_subtitle_filter'].set('all')
+                settings_vars['confirm_batch_operations'].set(True)
+                settings_vars['batch_operation_threshold'].set(10)
+                settings_vars['concurrent_downloads'].set(3)
+                settings_vars['enable_debug_logging'].set(False)
+
+        reset_btn = ctk.CTkButton(button_frame, text="Reset to Defaults",
+                                  command=reset_to_defaults,
+                                  width=130, fg_color="transparent", border_width=2,
+                                  border_color=("gray60", "gray40"),
+                                  text_color=("gray10", "gray90"))
+        reset_btn.pack(side="left")
 
         cancel_btn = ctk.CTkButton(button_frame, text="Cancel",
                                    command=settings_window.destroy,
-                                   width=100, fg_color="transparent", border_width=2)
+                                   width=100, fg_color="transparent", border_width=2,
+                                   text_color=("gray10", "gray90"))
         cancel_btn.pack(side="right", padx=(10, 0))
 
         save_btn = ctk.CTkButton(button_frame, text="Save Settings",
