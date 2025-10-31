@@ -506,7 +506,7 @@ class MainAppFrame(ctk.CTkFrame):
                                        state="disabled")
         self.search_btn.grid(row=0, column=0, padx=5, pady=15, sticky="ew")
 
-        self.download_btn = ctk.CTkButton(actions_frame, text="⬇ Download Best",
+        self.download_btn = ctk.CTkButton(actions_frame, text="⬇ Download Selected",
                                          command=self.download_subtitles, height=40,
                                          fg_color="#1f538d", hover_color="#1a4472",
                                          state="disabled")
@@ -525,10 +525,38 @@ class MainAppFrame(ctk.CTkFrame):
         self.set_btn.grid(row=0, column=3, padx=5, pady=15, sticky="ew")
 
         self.disable_btn = ctk.CTkButton(actions_frame, text="✗ Disable All",
-                                        command=self.disable_subtitles, height=40,
+                                        command=self.disable_subtitles, height=32,
                                         fg_color="#8b0000", hover_color="#6b0000",
                                         state="disabled")
-        self.disable_btn.grid(row=1, column=0, columnspan=4, padx=5, pady=(0, 15), sticky="ew")
+        self.disable_btn.grid(row=1, column=1, columnspan=2, padx=5, pady=(0, 15), sticky="ew")
+
+        # === SUBTITLE SELECTION PANEL ===
+        self.selection_frame = ctk.CTkFrame(right_panel)
+        self.selection_frame.grid(row=3, column=0, sticky="nsew", pady=10)
+        self.selection_frame.grid_columnconfigure(0, weight=1)
+        self.selection_frame.grid_rowconfigure(1, weight=1)
+        self.selection_frame.grid_remove()  # Hidden by default
+
+        selection_header = ctk.CTkFrame(self.selection_frame, fg_color="transparent")
+        selection_header.grid(row=0, column=0, sticky="ew", padx=15, pady=(15, 5))
+        selection_header.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(selection_header, text="📝 Select Subtitles to Download",
+                    font=ctk.CTkFont(weight="bold", size=14)).grid(row=0, column=0, sticky="w")
+
+        clear_selection_btn = ctk.CTkButton(selection_header, text="Clear Selection",
+                                           command=self.clear_subtitle_selection,
+                                           width=120, height=24)
+        clear_selection_btn.grid(row=0, column=1, sticky="e")
+
+        # Scrollable area for subtitle options
+        self.selection_scroll = ctk.CTkScrollableFrame(self.selection_frame, height=200,
+                                                       fg_color="transparent")
+        self.selection_scroll.grid(row=1, column=0, sticky="nsew", padx=15, pady=(0, 15))
+        self.selection_scroll.grid_columnconfigure(0, weight=1)
+
+        # Store selection variables
+        self.subtitle_selections = {}  # {item: IntVar for selected subtitle index}
 
         # === OUTPUT LOG ===
         log_frame = ctk.CTkFrame(right_panel)
@@ -1190,6 +1218,71 @@ class MainAppFrame(ctk.CTkFrame):
         """Get selected video items."""
         return self.selected_items
 
+    def clear_subtitle_selection(self):
+        """Clear the subtitle selection panel."""
+        for widget in self.selection_scroll.winfo_children():
+            widget.destroy()
+        self.subtitle_selections.clear()
+        self.selection_frame.grid_remove()
+
+    def populate_subtitle_selection_panel(self):
+        """Populate the selection panel with search results."""
+        # Clear existing widgets
+        self.clear_subtitle_selection()
+
+        if not self.search_results:
+            return
+
+        # Show the selection panel
+        self.selection_frame.grid()
+
+        row = 0
+        for item, subs_list in self.search_results.items():
+            if not subs_list:
+                continue
+
+            title = self._get_item_title(item)
+
+            # Video header frame
+            video_frame = ctk.CTkFrame(self.selection_scroll, fg_color=("gray85", "gray25"))
+            video_frame.grid(row=row, column=0, sticky="ew", pady=(0, 10))
+            video_frame.grid_columnconfigure(0, weight=1)
+
+            # Video title
+            ctk.CTkLabel(video_frame, text=title, font=ctk.CTkFont(weight="bold"),
+                        anchor="w").grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
+
+            # Subtitle options
+            selection_var = ctk.IntVar(value=0)  # Default to first subtitle
+            self.subtitle_selections[item] = selection_var
+
+            for i, sub in enumerate(subs_list[:10], 0):  # Show top 10 options
+                # Get subtitle info
+                release_info = (
+                    getattr(sub, 'movie_release_name', None) or
+                    getattr(sub, 'release', None) or
+                    getattr(sub, 'filename', None) or
+                    getattr(sub, 'info', None) or
+                    f"ID: {getattr(sub, 'subtitle_id', 'Unknown')}"
+                )
+                provider_info = getattr(sub, 'provider_name', 'unknown')
+
+                # Radio button for this subtitle
+                radio_text = f"[{provider_info}] {str(release_info)[:100]}"
+                radio = ctk.CTkRadioButton(video_frame, text=radio_text, variable=selection_var,
+                                          value=i)
+                radio.grid(row=i+1, column=0, sticky="w", padx=20, pady=2)
+
+            if len(subs_list) > 10:
+                ctk.CTkLabel(video_frame, text=f"... and {len(subs_list) - 10} more (showing top 10)",
+                            font=ctk.CTkFont(size=11), text_color="gray").grid(
+                    row=11, column=0, sticky="w", padx=20, pady=(2, 10))
+            else:
+                # Add padding at the end
+                ctk.CTkLabel(video_frame, text="").grid(row=len(subs_list)+1, column=0, pady=5)
+
+            row += 1
+
     def search_subtitles(self):
         """Search for available subtitles (does not download)."""
         def task():
@@ -1217,8 +1310,9 @@ class MainAppFrame(ctk.CTkFrame):
             self.log(f"Provider: {provider_name}")
             self.log(f"Language: {language_name} ({language_code}), SDH: {sdh}\n")
 
-            # Clear previous search results
+            # Clear previous search results and selection panel
             self.search_results = {}
+            self.safe_after(0, self.clear_subtitle_selection)
 
             from subliminal import list_subtitles
             # Use fromalpha2 for 2-letter codes (en, es, etc.)
@@ -1290,7 +1384,9 @@ class MainAppFrame(ctk.CTkFrame):
 
             self.log(f"\n✓ Search completed - Found {total_found} subtitle(s) for {len(self.search_results)} item(s)")
             if self.search_results:
-                self.log("💡 Click 'Download Best' to download the top match for each item\n")
+                self.log("💡 Select subtitles above and click 'Download Selected'\n")
+                # Populate the selection panel
+                self.safe_after(0, self.populate_subtitle_selection_panel)
             else:
                 self.log("")
 
@@ -1332,23 +1428,30 @@ class MainAppFrame(ctk.CTkFrame):
                     if not subs_list:
                         continue
 
-                    # Get best subtitle (first in list, already scored)
-                    best_sub = subs_list[0]
+                    # Get selected subtitle from selection panel
+                    if item in self.subtitle_selections:
+                        selected_index = self.subtitle_selections[item].get()
+                        if selected_index >= len(subs_list):
+                            selected_index = 0  # Fallback to first if out of range
+                        selected_sub = subs_list[selected_index]
+                    else:
+                        # Fallback to first subtitle if no selection exists
+                        selected_sub = subs_list[0]
 
                     self.log(f"⬇ {title}")
                     # Get useful info about the subtitle
                     release_info = (
-                        getattr(best_sub, 'movie_release_name', None) or
-                        getattr(best_sub, 'release', None) or
-                        getattr(best_sub, 'filename', None) or
-                        getattr(best_sub, 'info', None) or
-                        f"ID: {getattr(best_sub, 'subtitle_id', 'Unknown')}"
+                        getattr(selected_sub, 'movie_release_name', None) or
+                        getattr(selected_sub, 'release', None) or
+                        getattr(selected_sub, 'filename', None) or
+                        getattr(selected_sub, 'info', None) or
+                        f"ID: {getattr(selected_sub, 'subtitle_id', 'Unknown')}"
                     )
-                    provider_info = getattr(best_sub, 'provider_name', provider)
+                    provider_info = getattr(selected_sub, 'provider_name', provider)
                     self.log(f"  Downloading from {provider_info}: {release_info}")
 
                     # Download the subtitle content using subliminal API
-                    download_subtitles([best_sub], providers=[provider])
+                    download_subtitles([selected_sub], providers=[provider])
 
                     # Save to temporary file
                     import tempfile
@@ -1366,7 +1469,7 @@ class MainAppFrame(ctk.CTkFrame):
 
                     # Write subtitle content to file
                     with open(subtitle_path, 'wb') as f:
-                        f.write(best_sub.content)
+                        f.write(selected_sub.content)
 
                     # Upload to Plex server
                     item.uploadSubtitles(subtitle_path)
