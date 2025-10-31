@@ -700,6 +700,9 @@ class MainAppFrame(ctk.CTkFrame):
             # Store frame for filtering
             self.top_level_frames.append(frame)
 
+        # Trigger filter to ensure items are visible
+        self.filter_items()
+
     def populate_shows(self, shows):
         """Populate browser with shows (expandable)."""
         # Clear any loading indicator
@@ -728,7 +731,7 @@ class MainAppFrame(ctk.CTkFrame):
 
             show_cb = ctk.CTkCheckBox(show_inner, text=f"{show.title}",
                                      variable=show_var,
-                                     command=lambda s=show, v=show_var: self.on_show_selected(s, v))
+                                     command=lambda s=show, v=show_var, f=show_frame: self.on_show_selected(s, v, f))
             show_cb.pack(side="left", fill="x", expand=True)
 
             # Store references
@@ -736,9 +739,14 @@ class MainAppFrame(ctk.CTkFrame):
             show_frame.expand_var = expand_var
             show_frame.show_var = show_var
             show_frame.show_obj = show
+            show_frame.show_cb = show_cb  # Store checkbox reference
+            show_frame.season_frames = []  # Store season frames for disabling
 
             # Store frame for filtering
             self.top_level_frames.append(show_frame)
+
+        # Trigger filter to ensure items are visible
+        self.filter_items()
 
     def toggle_show(self, show, frame, expand_var):
         """Toggle show expansion to show seasons/episodes."""
@@ -782,6 +790,9 @@ class MainAppFrame(ctk.CTkFrame):
         season_container = ctk.CTkFrame(show_frame, fg_color="transparent")
         season_container.pack(fill="x", padx=(35, 0), pady=(5, 0))
 
+        # Clear season frames list
+        show_frame.season_frames = []
+
         for season in seasons:
             season_frame = ctk.CTkFrame(season_container, fg_color="transparent")
             season_frame.pack(fill="x", pady=2)
@@ -800,7 +811,7 @@ class MainAppFrame(ctk.CTkFrame):
 
             season_cb = ctk.CTkCheckBox(season_inner, text=f"Season {season.seasonNumber}",
                                        variable=season_var,
-                                       command=lambda s=season, v=season_var: self.on_season_selected(s, v))
+                                       command=lambda s=season, v=season_var, f=season_frame: self.on_season_selected(s, v, f))
             season_cb.pack(side="left")
 
             season_frame.expand_btn = expand_btn
@@ -808,6 +819,12 @@ class MainAppFrame(ctk.CTkFrame):
             season_frame.season_var = season_var
             season_frame.season_obj = season
             season_frame.season_inner = season_inner
+            season_frame.season_cb = season_cb  # Store checkbox reference
+            season_frame.episode_checkboxes = []  # Initialize list for episode checkboxes
+            season_frame.episode_vars = []  # Initialize list for episode variables
+
+            # Add this season frame to the parent show's list
+            show_frame.season_frames.append(season_frame)
 
     def toggle_season(self, season, frame, expand_var):
         """Toggle season expansion to show episodes."""
@@ -851,6 +868,12 @@ class MainAppFrame(ctk.CTkFrame):
         episode_container = ctk.CTkFrame(season_frame, fg_color="transparent")
         episode_container.pack(fill="x", padx=(25, 0), pady=(2, 0))
 
+        # Store episode checkboxes and variables in the season frame
+        if not hasattr(season_frame, 'episode_checkboxes'):
+            season_frame.episode_checkboxes = []
+        if not hasattr(season_frame, 'episode_vars'):
+            season_frame.episode_vars = []
+
         for episode in episodes:
             episode_var = ctk.BooleanVar()
 
@@ -864,6 +887,10 @@ class MainAppFrame(ctk.CTkFrame):
                                    command=lambda e=episode, v=episode_var: self.on_item_selected(e, v))
             ep_cb.pack(anchor="w", padx=(5, 0))
 
+            # Store references to checkbox and variable
+            season_frame.episode_checkboxes.append(ep_cb)
+            season_frame.episode_vars.append(episode_var)
+
     def on_item_selected(self, item, var):
         """Handle individual item (movie/episode) selection."""
         if var.get():
@@ -876,7 +903,7 @@ class MainAppFrame(ctk.CTkFrame):
                 self.selected_items.remove(item)
         self.update_selection_label()
 
-    def on_show_selected(self, show, var):
+    def on_show_selected(self, show, var, show_frame):
         """Handle show selection (selects all episodes)."""
         def load_and_select():
             if self._is_destroyed:
@@ -886,22 +913,63 @@ class MainAppFrame(ctk.CTkFrame):
                 if var.get():
                     # Show summary for the show
                     self.safe_after(0, lambda: self.log(f"\n📺 {show.title} - Selected all {len(episodes)} episodes"))
-                    self.safe_after(0, lambda: self.log(f"  Tip: Expand seasons and click individual episodes to see their subtitle status"))
+                    self.safe_after(0, lambda: self.log(f"  Tip: Uncheck the show to select individual seasons/episodes"))
 
                     for ep in episodes:
                         if ep not in self.selected_items:
                             self.selected_items.append(ep)
+
+                    # Check and disable all season and episode checkboxes when show is selected
+                    if hasattr(show_frame, 'season_frames'):
+                        for season_frame in show_frame.season_frames:
+                            # Check and disable season checkbox
+                            if hasattr(season_frame, 'season_cb') and hasattr(season_frame, 'season_var'):
+                                try:
+                                    self.safe_after(0, lambda v=season_frame.season_var: v.set(True))
+                                    self.safe_after(0, lambda cb=season_frame.season_cb: cb.configure(state="disabled"))
+                                except:
+                                    pass
+
+                            # Check and disable episode checkboxes
+                            if hasattr(season_frame, 'episode_checkboxes') and hasattr(season_frame, 'episode_vars'):
+                                for ep_cb, ep_var in zip(season_frame.episode_checkboxes, season_frame.episode_vars):
+                                    try:
+                                        self.safe_after(0, lambda v=ep_var: v.set(True))
+                                        self.safe_after(0, lambda cb=ep_cb: cb.configure(state="disabled"))
+                                    except:
+                                        pass
                 else:
                     for ep in episodes:
                         if ep in self.selected_items:
                             self.selected_items.remove(ep)
+
+                    # Uncheck and enable all season and episode checkboxes when show is deselected
+                    if hasattr(show_frame, 'season_frames'):
+                        for season_frame in show_frame.season_frames:
+                            # Uncheck and enable season checkbox
+                            if hasattr(season_frame, 'season_cb') and hasattr(season_frame, 'season_var'):
+                                try:
+                                    self.safe_after(0, lambda cb=season_frame.season_cb: cb.configure(state="normal"))
+                                    self.safe_after(0, lambda v=season_frame.season_var: v.set(False))
+                                except:
+                                    pass
+
+                            # Uncheck and enable episode checkboxes
+                            if hasattr(season_frame, 'episode_checkboxes') and hasattr(season_frame, 'episode_vars'):
+                                for ep_cb, ep_var in zip(season_frame.episode_checkboxes, season_frame.episode_vars):
+                                    try:
+                                        self.safe_after(0, lambda cb=ep_cb: cb.configure(state="normal"))
+                                        self.safe_after(0, lambda v=ep_var: v.set(False))
+                                    except:
+                                        pass
+
                 self.safe_after(0, self.update_selection_label)
             except Exception as e:
                 self.safe_after(0, lambda: self.log(f"Error: {e}"))
 
         threading.Thread(target=load_and_select, daemon=True).start()
 
-    def on_season_selected(self, season, var):
+    def on_season_selected(self, season, var, season_frame):
         """Handle season selection (selects all episodes in season)."""
         def load_and_select():
             if self._is_destroyed:
@@ -917,6 +985,17 @@ class MainAppFrame(ctk.CTkFrame):
                         if ep not in self.selected_items:
                             self.selected_items.append(ep)
 
+                    # Check all episode checkboxes and disable them when season is selected
+                    if hasattr(season_frame, 'episode_checkboxes') and hasattr(season_frame, 'episode_vars'):
+                        for i, (ep_cb, ep_var) in enumerate(zip(season_frame.episode_checkboxes, season_frame.episode_vars)):
+                            try:
+                                # Set checkbox to checked
+                                self.safe_after(0, lambda v=ep_var: v.set(True))
+                                # Then disable it
+                                self.safe_after(0, lambda cb=ep_cb: cb.configure(state="disabled"))
+                            except:
+                                pass
+
                     # Show subtitle status for all episodes in the season
                     for ep in episodes:
                         self.show_subtitle_status(ep)
@@ -924,6 +1003,18 @@ class MainAppFrame(ctk.CTkFrame):
                     for ep in episodes:
                         if ep in self.selected_items:
                             self.selected_items.remove(ep)
+
+                    # Uncheck all episode checkboxes and enable them when season is deselected
+                    if hasattr(season_frame, 'episode_checkboxes') and hasattr(season_frame, 'episode_vars'):
+                        for i, (ep_cb, ep_var) in enumerate(zip(season_frame.episode_checkboxes, season_frame.episode_vars)):
+                            try:
+                                # Enable checkbox first
+                                self.safe_after(0, lambda cb=ep_cb: cb.configure(state="normal"))
+                                # Then uncheck it
+                                self.safe_after(0, lambda v=ep_var: v.set(False))
+                            except:
+                                pass
+
                 self.safe_after(0, self.update_selection_label)
             except Exception as e:
                 self.safe_after(0, lambda: self.log(f"Error: {e}"))
