@@ -417,13 +417,13 @@ class MainAppFrame(ctk.CTkFrame):
 
         # Left column - Search language
         left_col = ctk.CTkFrame(options_frame, fg_color="transparent")
-        left_col.grid(row=0, column=0, padx=(15, 10), pady=15, sticky="ew")
+        left_col.grid(row=0, column=0, padx=(15, 10), pady=15, sticky="new")
 
-        ctk.CTkLabel(left_col, text="Search Language:", font=ctk.CTkFont(weight="bold")).pack(anchor="w")
+        ctk.CTkLabel(left_col, text="Search Language:", font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(0, 5))
         self.search_lang_combo = ctk.CTkComboBox(left_col, values=list(SEARCH_LANGUAGES.keys()),
-                                                 state="readonly")
+                                                 state="readonly", height=32)
         self.search_lang_combo.set("English")
-        self.search_lang_combo.pack(fill="x", pady=(5, 10))
+        self.search_lang_combo.pack(fill="x", pady=(0, 10))
 
         # Checkboxes
         checkbox_frame = ctk.CTkFrame(left_col, fg_color="transparent")
@@ -441,13 +441,13 @@ class MainAppFrame(ctk.CTkFrame):
 
         # Right column - Set language
         right_col = ctk.CTkFrame(options_frame, fg_color="transparent")
-        right_col.grid(row=0, column=1, padx=(10, 15), pady=15, sticky="ew")
+        right_col.grid(row=0, column=1, padx=(10, 15), pady=15, sticky="new")
 
-        ctk.CTkLabel(right_col, text="Set Language:", font=ctk.CTkFont(weight="bold")).pack(anchor="w")
+        ctk.CTkLabel(right_col, text="Set Language:", font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(0, 5))
         self.set_lang_combo = ctk.CTkComboBox(right_col, values=list(SET_LANGUAGES.keys()),
-                                             state="readonly")
+                                             state="readonly", height=32)
         self.set_lang_combo.set("English")
-        self.set_lang_combo.pack(fill="x", pady=(5, 0))
+        self.set_lang_combo.pack(fill="x", pady=(0, 10))
 
         # === ACTION BUTTONS ===
         actions_frame = ctk.CTkFrame(right_panel)
