@@ -571,6 +571,19 @@ class MainAppFrame(ctk.CTkFrame):
                                      state="disabled")
         self.list_btn.grid(row=0, column=2, padx=5, pady=15, sticky="ew")
 
+        # Second row for dry run and delete buttons
+        self.dry_run_btn = ctk.CTkButton(actions_frame, text="👁 Dry Run (Preview Missing)",
+                                        command=self.dry_run_missing_subtitles, height=40,
+                                        fg_color="#2d7a2d", hover_color="#236123",
+                                        state="disabled")
+        self.dry_run_btn.grid(row=1, column=0, columnspan=2, padx=5, pady=(0, 15), sticky="ew")
+
+        self.delete_subs_btn = ctk.CTkButton(actions_frame, text="🗑 Delete",
+                                             command=self.delete_subtitles, height=40,
+                                             fg_color="#8b0000", hover_color="#6b0000",
+                                             state="disabled")
+        self.delete_subs_btn.grid(row=1, column=2, padx=5, pady=(0, 15), sticky="ew")
+
         # === INFO PANEL (multi-purpose: subtitle selection, current subs, results) ===
         self.info_frame = ctk.CTkFrame(right_panel)
         self.info_frame.grid(row=3, column=0, sticky="nsew", pady=10)
@@ -1805,16 +1818,23 @@ class MainAppFrame(ctk.CTkFrame):
 
     def search_subtitles(self):
         """Search for available subtitles (does not download)."""
+        items = self.get_video_items()
+        if not items:
+            self.update_status("No items selected")
+            return
+
+        # Show confirmation dialog for bulk operations
+        if len(items) >= 5:
+            if not self.show_confirmation_dialog(
+                "Search Confirmation",
+                f"About to search for subtitles for {len(items)} item(s).\n\nContinue?"
+            ):
+                self.update_status("Search cancelled")
+                return
+
         def task():
             self.show_progress()
             self.disable_action_buttons()
-
-            items = self.get_video_items()
-            if not items:
-                self.safe_after(0, lambda: self.update_status("No items selected"))
-                self.hide_progress()
-                self.enable_action_buttons()
-                return
 
             language_name = self.search_lang_combo.get()
             language_code = SEARCH_LANGUAGES[language_name]
@@ -1906,15 +1926,23 @@ class MainAppFrame(ctk.CTkFrame):
 
     def download_subtitles(self):
         """Download selected subtitles from search results."""
+        if not self.search_results:
+            self.update_status("No search results - Search first")
+            return
+
+        # Show confirmation dialog for bulk operations
+        num_items = len(self.search_results)
+        if num_items >= 5:
+            if not self.show_confirmation_dialog(
+                "Download Confirmation",
+                f"About to download {num_items} subtitle(s).\n\nContinue?"
+            ):
+                self.update_status("Download cancelled")
+                return
+
         def task():
             self.show_progress()
             self.disable_action_buttons()
-
-            if not self.search_results:
-                self.safe_after(0, lambda: self.update_status("No search results - Search first"))
-                self.hide_progress()
-                self.enable_action_buttons()
-                return
 
             language_name = self.search_lang_combo.get()
             language_code = SEARCH_LANGUAGES[language_name]
@@ -2046,6 +2074,192 @@ class MainAppFrame(ctk.CTkFrame):
 
         threading.Thread(target=task, daemon=True).start()
 
+    def dry_run_missing_subtitles(self):
+        """Preview which subtitles would be available for items missing them (no download)."""
+        items = self.get_video_items()
+        if not items:
+            self.update_status("No items selected")
+            return
+
+        def task():
+            self.show_progress()
+            self.disable_action_buttons()
+
+            language_name = self.search_lang_combo.get()
+            language_code = SEARCH_LANGUAGES[language_name]
+            language_obj = Language.fromalpha2(language_code)
+            provider_name = self.provider_combo.get()
+            provider = SUBTITLE_PROVIDERS[provider_name]
+
+            self.safe_after(0, lambda: self.update_status(f"Dry run: Checking {len(items)} item(s) for missing subtitles..."))
+            self.log(f"Starting dry run for {len(items)} selected items...")
+
+            try:
+                # Filter items missing subtitles
+                items_missing_subs = []
+                for i, item in enumerate(items):
+                    if self._is_destroyed:
+                        return
+
+                    if (i + 1) % 10 == 0:
+                        self.safe_after(0, lambda count=i+1, total=len(items):
+                            self.update_status(f"Checking items... ({count}/{total})"))
+
+                    if not self.check_has_subtitles(item, force_refresh=False):
+                        items_missing_subs.append(item)
+
+                if not items_missing_subs:
+                    self.log(f"✓ All selected items already have subtitles!")
+                    self.safe_after(0, lambda: self.update_status("All selected items already have subtitles"))
+                    self.safe_after(0, lambda: messagebox.showinfo(
+                        "Dry Run Complete", "All selected items already have subtitles.", parent=self))
+                    self.hide_progress()
+                    self.enable_action_buttons()
+                    return
+
+                self.log(f"Found {len(items_missing_subs)} items missing subtitles out of {len(items)} selected")
+                self.safe_after(0, lambda: self.update_status(f"Searching for available subtitles..."))
+
+                # Search for available subtitles
+                from subliminal import list_subtitles
+                preview_results = {}  # {item: [subtitles]}
+                total_subs_found = 0
+
+                for i, item in enumerate(items_missing_subs):
+                    if self._is_destroyed:
+                        return
+
+                    title = self._get_item_title(item)
+                    self.safe_after(0, lambda t=title, idx=i+1, total=len(items_missing_subs):
+                        self.update_status(f"Searching ({idx}/{total}): {t}"))
+
+                    try:
+                        # Create subliminal Video object
+                        if isinstance(item, Episode):
+                            fake_name = f"{item.grandparentTitle}.S{item.seasonNumber:02d}E{item.index:02d}.mkv"
+                            video = SubliminalEpisode(
+                                name=fake_name,
+                                series=item.grandparentTitle,
+                                season=item.seasonNumber,
+                                episodes=item.index
+                            )
+                            video.title = item.title
+                            if hasattr(item, 'year') and item.year:
+                                video.year = item.year
+                        elif isinstance(item, Movie):
+                            year = getattr(item, 'year', '')
+                            fake_name = f"{item.title}.{year}.mkv" if year else f"{item.title}.mkv"
+                            video = SubliminalMovie(
+                                name=fake_name,
+                                title=item.title,
+                                year=getattr(item, 'year', None)
+                            )
+                        else:
+                            continue
+
+                        # Search for subtitles
+                        subtitles = list_subtitles({video}, {language_obj}, providers=[provider])
+
+                        if video in subtitles and subtitles[video]:
+                            subs_list = list(subtitles[video])
+                            preview_results[item] = subs_list
+                            total_subs_found += len(subs_list)
+                            self.log(f"  ✓ {title} - {len(subs_list)} subtitle(s) available")
+                        else:
+                            preview_results[item] = []
+                            self.log(f"  ✗ {title} - No subtitles found")
+
+                    except Exception as e:
+                        preview_results[item] = []
+                        self.log(f"  ✗ {title} - Error: {e}")
+
+                # Display results in info panel
+                self.safe_after(0, lambda: self.display_dry_run_results(preview_results, language_name, provider_name))
+
+                items_with_subs = sum(1 for subs in preview_results.values() if subs)
+                self.log(f"\nDry run complete: {items_with_subs}/{len(items_missing_subs)} items have available subtitles ({total_subs_found} total)")
+                self.safe_after(0, lambda: self.update_status(
+                    f"✓ Dry run complete: {items_with_subs}/{len(items_missing_subs)} items have subtitles available"))
+
+            except Exception as e:
+                self.log(f"✗ Dry run error: {e}")
+                self.safe_after(0, lambda: self.update_status(f"Error: {e}"))
+
+            self.hide_progress()
+            self.enable_action_buttons()
+
+        threading.Thread(target=task, daemon=True).start()
+
+    def display_dry_run_results(self, results, language_name, provider_name):
+        """Display dry run results in info panel."""
+        self.clear_info_panel()
+        self.info_panel_title.configure(text=f"👁 Dry Run Preview - {language_name} ({provider_name})")
+        self.info_panel_action_btn.configure(text="Close", command=self.clear_info_panel)
+        self.info_frame.grid()
+
+        if not results:
+            ctk.CTkLabel(self.info_scroll, text="No results to display",
+                        font=ctk.CTkFont(size=12), text_color="gray").grid(row=0, column=0, pady=20)
+            return
+
+        row = 0
+        items_with_subs = 0
+        items_without_subs = 0
+
+        for item, subs_list in results.items():
+            title = self._get_item_title(item)
+
+            # Create frame for this item
+            item_frame = ctk.CTkFrame(self.info_scroll, fg_color=("gray85", "gray25"))
+            item_frame.grid(row=row, column=0, sticky="ew", pady=(0, 10))
+            item_frame.grid_columnconfigure(0, weight=1)
+
+            if subs_list:
+                items_with_subs += 1
+                # Title with checkmark
+                title_label = ctk.CTkLabel(item_frame, text=f"✓ {title}",
+                                          font=ctk.CTkFont(weight="bold"), text_color="#2d7a2d",
+                                          anchor="w")
+                title_label.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
+
+                # Number of subtitles available
+                count_label = ctk.CTkLabel(item_frame, text=f"{len(subs_list)} subtitle(s) would be available",
+                                          font=ctk.CTkFont(size=11), text_color="gray",
+                                          anchor="w")
+                count_label.grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 10))
+            else:
+                items_without_subs += 1
+                # Title with X
+                title_label = ctk.CTkLabel(item_frame, text=f"✗ {title}",
+                                          font=ctk.CTkFont(weight="bold"), text_color="#8b0000",
+                                          anchor="w")
+                title_label.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
+
+                # No subtitles message
+                no_subs_label = ctk.CTkLabel(item_frame, text="No subtitles found",
+                                            font=ctk.CTkFont(size=11), text_color="gray",
+                                            anchor="w")
+                no_subs_label.grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 10))
+
+            row += 1
+
+        # Summary at the top
+        summary_frame = ctk.CTkFrame(self.info_scroll, fg_color=("gray75", "gray30"))
+        summary_frame.grid(row=0, column=0, sticky="ew", pady=(0, 15))
+        summary_frame.grid_columnconfigure(0, weight=1)
+
+        summary_text = f"📊 Summary: {items_with_subs} items have subtitles | {items_without_subs} items without"
+        summary_label = ctk.CTkLabel(summary_frame, text=summary_text,
+                                     font=ctk.CTkFont(size=12, weight="bold"),
+                                     anchor="w")
+        summary_label.grid(row=0, column=0, sticky="ew", padx=15, pady=10)
+
+        # Shift all item frames down
+        for widget in self.info_scroll.winfo_children():
+            if widget != summary_frame:
+                current_row = widget.grid_info()['row']
+                widget.grid(row=current_row + 1)
+
     def list_subtitles(self):
         """List available subtitles in info panel."""
         def task():
@@ -2157,6 +2371,108 @@ class MainAppFrame(ctk.CTkFrame):
 
         threading.Thread(target=task, daemon=True).start()
 
+    def delete_subtitles(self):
+        """Delete all subtitle streams from selected items."""
+        items = self.get_video_items()
+        if not items:
+            self.update_status("No items selected")
+            return
+
+        # Show confirmation dialog for bulk operations
+        num_items = len(items)
+        if num_items >= 5:
+            if not self.show_confirmation_dialog(
+                "Delete Confirmation",
+                f"About to delete all subtitles from {num_items} item(s).\n\nThis action cannot be undone. Continue?"
+            ):
+                self.update_status("Delete cancelled")
+                return
+        else:
+            # Even for small number of items, confirm deletion
+            if not self.show_confirmation_dialog(
+                "Delete Confirmation",
+                f"About to delete all subtitles from {num_items} item(s).\n\nThis action cannot be undone. Continue?"
+            ):
+                self.update_status("Delete cancelled")
+                return
+
+        def task():
+            self.show_progress()
+            self.disable_action_buttons()
+            self.safe_after(0, lambda: self.update_status(f"Deleting subtitles from {num_items} item(s)..."))
+
+            success_count = 0
+            error_count = 0
+            successful_items = []
+
+            for item in items:
+                if self._is_destroyed:
+                    return
+
+                title = self._get_item_title(item)
+                try:
+                    # Get all subtitle streams for this item
+                    subtitles_deleted = False
+                    for media in item.media:
+                        for part in media.parts:
+                            subs = part.subtitleStreams()
+                            if subs:
+                                # Try to remove each subtitle
+                                for sub in subs:
+                                    try:
+                                        # Use removeSubtitles method from PlexAPI
+                                        item.removeSubtitles(subtitleStream=sub)
+                                        subtitles_deleted = True
+                                    except Exception as sub_error:
+                                        # Some subtitles (embedded) cannot be removed
+                                        self.log(f"  Note: Could not remove {sub.language or 'unknown'} subtitle from {title}: {sub_error}")
+
+                    if subtitles_deleted:
+                        success_count += 1
+                        successful_items.append(item)
+                        self.log(f"  ✓ {title}")
+
+                        # Reload item to update cache
+                        try:
+                            item.reload()
+                            self.subtitle_status_cache[item.ratingKey] = False
+                        except:
+                            pass
+                    else:
+                        self.log(f"  ℹ {title} - No subtitles to delete or all are embedded")
+                        error_count += 1
+
+                except Exception as e:
+                    self.log(f"  ✗ {title} - Error: {e}")
+                    error_count += 1
+
+            # Final status
+            self.log(f"\nDeletion complete: {success_count} successful, {error_count} failed/no subtitles")
+            self.safe_after(0, lambda: self.update_status(
+                f"✓ Deleted subtitles from {success_count}/{num_items} item(s)"))
+
+            if successful_items:
+                self.safe_after(0, lambda: messagebox.showinfo(
+                    "Complete",
+                    f"Subtitle deletion finished!\n\n"
+                    f"Successfully deleted: {success_count}\n"
+                    f"Failed or no subtitles: {error_count}",
+                    parent=self))
+
+                # Refresh subtitle indicators
+                self.safe_after(0, lambda: self.refresh_subtitle_indicators(successful_items))
+            else:
+                self.safe_after(0, lambda: messagebox.showwarning(
+                    "No Changes",
+                    f"No subtitles were deleted.\n\n"
+                    f"Items may have no subtitles or only embedded subtitles (which cannot be removed).",
+                    parent=self))
+
+            self.hide_progress()
+            self.enable_action_buttons()
+
+        threading.Thread(target=task, daemon=True).start()
+
     def show_progress(self):
         """Show progress bar."""
         self.progress_bar.grid()
@@ -2172,6 +2488,8 @@ class MainAppFrame(ctk.CTkFrame):
         self.search_btn.configure(state="disabled")
         self.download_btn.configure(state="disabled")
         self.list_btn.configure(state="disabled")
+        self.dry_run_btn.configure(state="disabled")
+        self.delete_subs_btn.configure(state="disabled")
         self.refresh_browser_btn.configure(state="disabled")
 
     def enable_action_buttons(self):
@@ -2179,6 +2497,8 @@ class MainAppFrame(ctk.CTkFrame):
         state = "normal" if self.selected_items else "disabled"
         self.search_btn.configure(state=state)
         self.list_btn.configure(state=state)
+        self.dry_run_btn.configure(state=state)
+        self.delete_subs_btn.configure(state=state)
 
         # Download button only enabled if we have search results
         download_state = "normal" if self.search_results else "disabled"
@@ -2194,6 +2514,10 @@ class MainAppFrame(ctk.CTkFrame):
             return f"{item.grandparentTitle} S{item.seasonNumber:02d}E{item.index:02d} - {item.title}"
         else:
             return item.title
+
+    def show_confirmation_dialog(self, title, message):
+        """Show a confirmation dialog and return True if user confirms."""
+        return messagebox.askyesno(title, message, parent=self)
 
     def load_settings(self):
         """Load application settings."""
