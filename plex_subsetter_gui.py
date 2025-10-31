@@ -124,7 +124,7 @@ class LoginFrame(ctk.CTkFrame):
         author_label.pack(pady=(0, 5))
 
         # Clickable repository link
-        repo_label = ctk.CTkLabel(footer_frame, text="🔗 View on GitHub",
+        repo_label = ctk.CTkLabel(footer_frame, text="View on GitHub",
                                   font=ctk.CTkFont(size=10, underline=True),
                                   text_color="#58a6ff", cursor="hand2")
         repo_label.pack()
@@ -798,6 +798,8 @@ class MainAppFrame(ctk.CTkFrame):
 
         # Only apply subtitle filter to movies (not shows)
         if not hasattr(self, 'all_movies') or self.all_movies is None:
+            # Clear filter status label for shows
+            self.filter_status_label.configure(text="")
             return
 
         visible_count = 0
@@ -1055,8 +1057,16 @@ class MainAppFrame(ctk.CTkFrame):
                             has_subs = self.check_has_subtitles(item)
                             status_icon = "✓" if has_subs else "✗"
                             status_color = "#2d7a2d" if has_subs else "#8b0000"
-                            self.safe_after(0, lambda f=frame, i=status_icon, c=status_color:
-                                           f.status_label.configure(text=i, text_color=c))
+
+                            def update_status_label(frame_ref=frame, icon=status_icon, color=status_color):
+                                try:
+                                    # Check if widget still exists before updating
+                                    if frame_ref.winfo_exists() and hasattr(frame_ref, 'status_label'):
+                                        frame_ref.status_label.configure(text=icon, text_color=color)
+                                except:
+                                    pass
+
+                            self.safe_after(0, update_status_label)
                         except:
                             pass
                     # Apply subtitle status filter after loading all statuses
@@ -1089,6 +1099,8 @@ class MainAppFrame(ctk.CTkFrame):
         self.filter_btn_frame.grid_remove()
         # Reset filter to "all"
         self.subtitle_status_filter = "all"
+        # Clear filter status label (shows don't use subtitle status filter)
+        self.filter_status_label.configure(text="")
 
         # Store all shows (unfiltered) and clear movies
         self.all_shows = shows
@@ -1399,8 +1411,16 @@ class MainAppFrame(ctk.CTkFrame):
                             has_subs = self.check_has_subtitles(item)
                             status_icon = "✓" if has_subs else "✗"
                             status_color = "#2d7a2d" if has_subs else "#8b0000"
-                            self.safe_after(0, lambda f=frame, i=status_icon, c=status_color:
-                                           f.status_label.configure(text=i, text_color=c))
+
+                            def update_status_label(frame_ref=frame, icon=status_icon, color=status_color):
+                                try:
+                                    # Check if widget still exists before updating
+                                    if frame_ref.winfo_exists() and hasattr(frame_ref, 'status_label'):
+                                        frame_ref.status_label.configure(text=icon, text_color=color)
+                                except:
+                                    pass
+
+                            self.safe_after(0, update_status_label)
                         except:
                             pass
                 threading.Thread(target=load_subtitle_status, daemon=True).start()
@@ -1699,13 +1719,20 @@ class MainAppFrame(ctk.CTkFrame):
             if not hasattr(frame, 'status_label') or not hasattr(frame, 'item_obj'):
                 return
 
-            item = frame.item_obj
-            has_subs = self.check_has_subtitles(item, force_refresh=True)
+            try:
+                # Check if widget still exists before accessing
+                if not frame.winfo_exists():
+                    return
 
-            # Update indicator
-            status_icon = "✓" if has_subs else "✗"
-            status_color = "#2d7a2d" if has_subs else "#8b0000"
-            frame.status_label.configure(text=status_icon, text_color=status_color)
+                item = frame.item_obj
+                has_subs = self.check_has_subtitles(item, force_refresh=True)
+
+                # Update indicator
+                status_icon = "✓" if has_subs else "✗"
+                status_color = "#2d7a2d" if has_subs else "#8b0000"
+                frame.status_label.configure(text=status_icon, text_color=status_color)
+            except:
+                pass
 
         def search_frames_recursive(widget, item_ids=None):
             """Recursively search for frames with item_obj."""
