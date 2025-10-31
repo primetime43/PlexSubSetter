@@ -287,6 +287,9 @@ class MainAppFrame(ctk.CTkFrame):
         self.selected_items = []  # Items selected for subtitle management
         self.current_library = None
         self._is_destroyed = False
+        self.top_level_frames = []  # Store only top-level show/movie frames for filtering
+        self.search_text = ctk.StringVar()
+        self.search_text.trace_add("write", lambda *args: self.filter_items())
 
         # Configure grid - two column layout
         self.grid_columnconfigure(0, weight=0, minsize=380)  # Browser panel
@@ -319,7 +322,7 @@ class MainAppFrame(ctk.CTkFrame):
         browser_panel = ctk.CTkFrame(self)
         browser_panel.grid(row=0, column=0, sticky="nsew", padx=(20, 10), pady=20)
         browser_panel.grid_columnconfigure(0, weight=1)
-        browser_panel.grid_rowconfigure(2, weight=1)
+        browser_panel.grid_rowconfigure(3, weight=1)  # Updated for search bar
 
         # Browser header
         ctk.CTkLabel(browser_panel, text="📚 Library Browser",
@@ -339,14 +342,33 @@ class MainAppFrame(ctk.CTkFrame):
                                                 command=self.load_library_content, height=28)
         self.refresh_browser_btn.grid(row=1, column=0, sticky="ew")
 
+        # Search/Filter bar
+        search_frame = ctk.CTkFrame(browser_panel, fg_color="transparent")
+        search_frame.grid(row=2, column=0, padx=15, pady=(5, 0), sticky="ew")
+        search_frame.grid_columnconfigure(0, weight=1)
+
+        self.search_entry = ctk.CTkEntry(search_frame, placeholder_text="🔍 Search/filter items...",
+                                         textvariable=self.search_text, height=32)
+        self.search_entry.grid(row=0, column=0, sticky="ew", padx=(0, 5))
+
+        clear_search_btn = ctk.CTkButton(search_frame, text="✕", width=32, height=32,
+                                        command=self.clear_search,
+                                        fg_color="transparent", hover_color="#404040")
+        clear_search_btn.grid(row=0, column=1)
+
+        # Filter status label (shows filter results count)
+        self.filter_status_label = ctk.CTkLabel(browser_panel, text="",
+                                               font=ctk.CTkFont(size=10), text_color="gray")
+        self.filter_status_label.grid(row=2, column=0, padx=15, pady=(35, 0), sticky="w")
+
         # Browser scrollable frame
         self.browser_scroll = ctk.CTkScrollableFrame(browser_panel, label_text="Select Items")
-        self.browser_scroll.grid(row=2, column=0, padx=15, pady=(10, 10), sticky="nsew")
+        self.browser_scroll.grid(row=3, column=0, padx=15, pady=(10, 10), sticky="nsew")
         self.browser_scroll.grid_columnconfigure(0, weight=1)
 
         # Selection info and controls
         select_control_frame = ctk.CTkFrame(browser_panel, fg_color="transparent")
-        select_control_frame.grid(row=3, column=0, padx=15, pady=(0, 15), sticky="ew")
+        select_control_frame.grid(row=4, column=0, padx=15, pady=(0, 15), sticky="ew")
         select_control_frame.grid_columnconfigure(0, weight=1)
 
         self.selection_label = ctk.CTkLabel(select_control_frame, text="0 items selected",
@@ -553,6 +575,69 @@ class MainAppFrame(ctk.CTkFrame):
         if hasattr(self, 'browser_progress'):
             self.browser_progress.stop()
 
+    def clear_search(self):
+        """Clear the search filter."""
+        self.search_text.set("")
+        self.filter_status_label.configure(text="")
+
+    def filter_items(self):
+        """Filter displayed items based on search text (top-level only: show/movie names)."""
+        search_query = self.search_text.get().lower().strip()
+
+        if not search_query:
+            # No filter - show all items
+            for frame in self.top_level_frames:
+                try:
+                    frame.pack(fill="x", pady=2, padx=5)
+                except:
+                    pass
+            self.filter_status_label.configure(text="")
+            return
+
+        # Filter items - only check top-level names (shows/movies)
+        visible_count = 0
+        total_count = len(self.top_level_frames)
+
+        for frame in self.top_level_frames:
+            match_found = False
+
+            # Check if it's a show frame (has show_obj attribute)
+            if hasattr(frame, 'show_obj'):
+                # For shows, only check the show title (no deep search)
+                show = frame.show_obj
+                if search_query in show.title.lower():
+                    match_found = True
+            else:
+                # For movies, check the checkbox text
+                for child in frame.winfo_children():
+                    if isinstance(child, ctk.CTkCheckBox):
+                        checkbox_text = child.cget("text").lower()
+                        if search_query in checkbox_text:
+                            match_found = True
+                            break
+
+            # Show or hide based on match
+            if match_found:
+                try:
+                    frame.pack(fill="x", pady=2, padx=5)
+                    visible_count += 1
+                except:
+                    pass
+            else:
+                try:
+                    frame.pack_forget()
+                except:
+                    pass
+
+        # Update filter status
+        if visible_count == total_count:
+            self.filter_status_label.configure(text="")
+        else:
+            self.filter_status_label.configure(
+                text=f"Showing {visible_count} of {total_count} items",
+                text_color="#e5a00d"
+            )
+
     def load_library_content(self):
         """Load content from selected library into browser."""
         library_name = self.library_combo.get()
@@ -561,6 +646,7 @@ class MainAppFrame(ctk.CTkFrame):
 
         self.log(f"Loading {library_name}...")
         self.clear_selection()
+        self.clear_search()  # Clear search filter when loading new library
 
         # Show loading indicator
         self.show_browser_loading()
@@ -598,6 +684,9 @@ class MainAppFrame(ctk.CTkFrame):
         for widget in self.browser_scroll.winfo_children():
             widget.destroy()
 
+        # Clear top-level frames list
+        self.top_level_frames.clear()
+
         for movie in movies:
             var = ctk.BooleanVar()
             frame = ctk.CTkFrame(self.browser_scroll, fg_color="transparent")
@@ -608,11 +697,17 @@ class MainAppFrame(ctk.CTkFrame):
                                 command=lambda m=movie, v=var: self.on_item_selected(m, v))
             cb.pack(side="left", fill="x", expand=True)
 
+            # Store frame for filtering
+            self.top_level_frames.append(frame)
+
     def populate_shows(self, shows):
         """Populate browser with shows (expandable)."""
         # Clear any loading indicator
         for widget in self.browser_scroll.winfo_children():
             widget.destroy()
+
+        # Clear top-level frames list
+        self.top_level_frames.clear()
 
         for show in shows:
             # Show frame
@@ -641,6 +736,9 @@ class MainAppFrame(ctk.CTkFrame):
             show_frame.expand_var = expand_var
             show_frame.show_var = show_var
             show_frame.show_obj = show
+
+            # Store frame for filtering
+            self.top_level_frames.append(show_frame)
 
     def toggle_show(self, show, frame, expand_var):
         """Toggle show expansion to show seasons/episodes."""
@@ -688,15 +786,19 @@ class MainAppFrame(ctk.CTkFrame):
             season_frame = ctk.CTkFrame(season_container, fg_color="transparent")
             season_frame.pack(fill="x", pady=2)
 
+            # Season inner frame (for button and checkbox)
+            season_inner = ctk.CTkFrame(season_frame, fg_color="transparent")
+            season_inner.pack(fill="x")
+
             season_var = ctk.BooleanVar()
             expand_var = ctk.BooleanVar(value=False)
 
-            expand_btn = ctk.CTkButton(season_frame, text="▶", width=25, height=20,
+            expand_btn = ctk.CTkButton(season_inner, text="▶", width=25, height=20,
                                        fg_color="transparent", font=ctk.CTkFont(size=10),
                                        command=lambda s=season, f=season_frame, v=expand_var: self.toggle_season(s, f, v))
             expand_btn.pack(side="left", padx=(0, 5))
 
-            season_cb = ctk.CTkCheckBox(season_frame, text=f"Season {season.seasonNumber}",
+            season_cb = ctk.CTkCheckBox(season_inner, text=f"Season {season.seasonNumber}",
                                        variable=season_var,
                                        command=lambda s=season, v=season_var: self.on_season_selected(s, v))
             season_cb.pack(side="left")
@@ -705,6 +807,7 @@ class MainAppFrame(ctk.CTkFrame):
             season_frame.expand_var = expand_var
             season_frame.season_var = season_var
             season_frame.season_obj = season
+            season_frame.season_inner = season_inner
 
     def toggle_season(self, season, frame, expand_var):
         """Toggle season expansion to show episodes."""
@@ -712,9 +815,9 @@ class MainAppFrame(ctk.CTkFrame):
             # Collapse
             expand_var.set(False)
             frame.expand_btn.configure(text="▶")
-            # Remove episode frames
+            # Remove episode containers (keep season_inner)
             for widget in frame.winfo_children():
-                if widget != frame.expand_btn.master:
+                if widget != frame.season_inner:
                     widget.destroy()
         else:
             # Expand
@@ -723,7 +826,7 @@ class MainAppFrame(ctk.CTkFrame):
 
             # Show loading indicator
             loading_container = ctk.CTkFrame(frame, fg_color="transparent")
-            loading_container.pack(fill="x", padx=(30, 0), pady=(5, 0))
+            loading_container.pack(fill="x", padx=(25, 0), pady=(2, 0))
             loading_label = ctk.CTkLabel(loading_container, text="Loading episodes...",
                                         font=ctk.CTkFont(size=10), text_color="gray")
             loading_label.pack(anchor="w")
@@ -746,15 +849,20 @@ class MainAppFrame(ctk.CTkFrame):
     def populate_episodes(self, season_frame, episodes):
         """Populate episodes under a season."""
         episode_container = ctk.CTkFrame(season_frame, fg_color="transparent")
-        episode_container.pack(fill="x", padx=(30, 0), pady=(5, 0))
+        episode_container.pack(fill="x", padx=(25, 0), pady=(2, 0))
 
         for episode in episodes:
             episode_var = ctk.BooleanVar()
-            ep_cb = ctk.CTkCheckBox(episode_container,
+
+            # Create a frame for each episode for better layout
+            ep_frame = ctk.CTkFrame(episode_container, fg_color="transparent")
+            ep_frame.pack(fill="x", pady=1)
+
+            ep_cb = ctk.CTkCheckBox(ep_frame,
                                    text=f"E{episode.index:02d} - {episode.title}",
                                    variable=episode_var,
                                    command=lambda e=episode, v=episode_var: self.on_item_selected(e, v))
-            ep_cb.pack(anchor="w", pady=1)
+            ep_cb.pack(anchor="w", padx=(5, 0))
 
     def on_item_selected(self, item, var):
         """Handle individual item (movie/episode) selection."""
