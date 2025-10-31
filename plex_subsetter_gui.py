@@ -4,6 +4,10 @@ PlexSubSetter GUI - Mass Subtitle Finder and Setter for Plex
 A modern graphical tool to search, download, and set subtitles for your Plex media library.
 """
 
+__version__ = "1.0.0"
+__author__ = "primetime43"
+__repo__ = "https://github.com/primetime43/PlexSubSetter"
+
 import customtkinter as ctk
 from tkinter import messagebox
 import threading
@@ -105,7 +109,26 @@ class LoginFrame(ctk.CTkFrame):
         info_text = "You'll be redirected to Plex.tv to sign in securely.\nNo credentials are stored in this application."
         info_label = ctk.CTkLabel(self, text=info_text, font=ctk.CTkFont(size=11),
                                  text_color="gray", wraplength=400)
-        info_label.grid(row=3, column=0, pady=(40, 60))
+        info_label.grid(row=3, column=0, pady=(40, 20))
+
+        # Footer with version, author, and repo link
+        footer_frame = ctk.CTkFrame(self, fg_color="transparent")
+        footer_frame.grid(row=4, column=0, pady=(10, 40))
+
+        version_label = ctk.CTkLabel(footer_frame, text=f"Version {__version__}",
+                                     font=ctk.CTkFont(size=10), text_color="gray")
+        version_label.pack(pady=(0, 5))
+
+        author_label = ctk.CTkLabel(footer_frame, text=f"Created by {__author__}",
+                                    font=ctk.CTkFont(size=10), text_color="gray")
+        author_label.pack(pady=(0, 5))
+
+        # Clickable repository link
+        repo_label = ctk.CTkLabel(footer_frame, text="🔗 View on GitHub",
+                                  font=ctk.CTkFont(size=10, underline=True),
+                                  text_color="#58a6ff", cursor="hand2")
+        repo_label.pack()
+        repo_label.bind("<Button-1>", lambda e: webbrowser.open(__repo__))
 
     def start_oauth_login(self):
         """Start the OAuth login process."""
