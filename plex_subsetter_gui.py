@@ -507,6 +507,32 @@ class MainAppFrame(ctk.CTkFrame):
         """Handle library selection change."""
         self.load_library_content()
 
+    def show_browser_loading(self):
+        """Show loading indicator in browser."""
+        # Clear browser
+        for widget in self.browser_scroll.winfo_children():
+            widget.destroy()
+
+        # Create loading frame
+        loading_frame = ctk.CTkFrame(self.browser_scroll, fg_color="transparent")
+        loading_frame.pack(expand=True, fill="both", pady=50)
+
+        # Loading spinner (animated dots)
+        self.loading_label = ctk.CTkLabel(loading_frame, text="Loading library...",
+                                         font=ctk.CTkFont(size=14),
+                                         text_color="gray")
+        self.loading_label.pack(pady=(20, 10))
+
+        # Progress bar
+        self.browser_progress = ctk.CTkProgressBar(loading_frame, mode="indeterminate", width=200)
+        self.browser_progress.pack(pady=10)
+        self.browser_progress.start()
+
+    def hide_browser_loading(self):
+        """Hide loading indicator in browser."""
+        if hasattr(self, 'browser_progress'):
+            self.browser_progress.stop()
+
     def load_library_content(self):
         """Load content from selected library into browser."""
         library_name = self.library_combo.get()
@@ -516,32 +542,39 @@ class MainAppFrame(ctk.CTkFrame):
         self.log(f"Loading {library_name}...")
         self.clear_selection()
 
-        # Clear browser
-        for widget in self.browser_scroll.winfo_children():
-            widget.destroy()
+        # Show loading indicator
+        self.show_browser_loading()
 
         def load_thread():
             try:
                 self.current_library = next((lib for lib in self.libraries if lib.title == library_name), None)
                 if not self.current_library:
+                    self.after(0, self.hide_browser_loading)
                     return
 
                 if self.current_library.type == 'movie':
                     movies = self.current_library.all()
+                    self.after(0, lambda: self.hide_browser_loading())
                     self.after(0, lambda: self.populate_movies(movies))
                 elif self.current_library.type == 'show':
                     shows = self.current_library.all()
+                    self.after(0, lambda: self.hide_browser_loading())
                     self.after(0, lambda: self.populate_shows(shows))
 
                 self.after(0, lambda: self.log(f"✓ Loaded {library_name}\n"))
 
             except Exception as e:
+                self.after(0, lambda: self.hide_browser_loading())
                 self.after(0, lambda: self.log(f"✗ Error loading library: {e}\n"))
 
         threading.Thread(target=load_thread, daemon=True).start()
 
     def populate_movies(self, movies):
         """Populate browser with movies."""
+        # Clear any loading indicator
+        for widget in self.browser_scroll.winfo_children():
+            widget.destroy()
+
         for movie in movies:
             var = ctk.BooleanVar()
             frame = ctk.CTkFrame(self.browser_scroll, fg_color="transparent")
@@ -554,6 +587,10 @@ class MainAppFrame(ctk.CTkFrame):
 
     def populate_shows(self, shows):
         """Populate browser with shows (expandable)."""
+        # Clear any loading indicator
+        for widget in self.browser_scroll.winfo_children():
+            widget.destroy()
+
         for show in shows:
             # Show frame
             show_frame = ctk.CTkFrame(self.browser_scroll, fg_color="transparent")
@@ -597,12 +634,22 @@ class MainAppFrame(ctk.CTkFrame):
             expand_var.set(True)
             frame.expand_btn.configure(text="▼")
 
+            # Show loading indicator
+            loading_container = ctk.CTkFrame(frame, fg_color="transparent")
+            loading_container.pack(fill="x", padx=(35, 0), pady=(5, 0))
+            loading_label = ctk.CTkLabel(loading_container, text="Loading seasons...",
+                                        font=ctk.CTkFont(size=11), text_color="gray")
+            loading_label.pack(anchor="w")
+
             # Load seasons in thread
             def load_seasons():
                 try:
                     seasons = show.seasons()
+                    # Remove loading indicator before populating
+                    self.after(0, lambda: loading_container.destroy())
                     self.after(0, lambda: self.populate_seasons(frame, seasons))
                 except Exception as e:
+                    self.after(0, lambda: loading_container.destroy())
                     self.after(0, lambda: self.log(f"Error loading seasons: {e}"))
 
             threading.Thread(target=load_seasons, daemon=True).start()
@@ -649,12 +696,22 @@ class MainAppFrame(ctk.CTkFrame):
             expand_var.set(True)
             frame.expand_btn.configure(text="▼")
 
+            # Show loading indicator
+            loading_container = ctk.CTkFrame(frame, fg_color="transparent")
+            loading_container.pack(fill="x", padx=(30, 0), pady=(5, 0))
+            loading_label = ctk.CTkLabel(loading_container, text="Loading episodes...",
+                                        font=ctk.CTkFont(size=10), text_color="gray")
+            loading_label.pack(anchor="w")
+
             # Load episodes in thread
             def load_episodes():
                 try:
                     episodes = season.episodes()
+                    # Remove loading indicator before populating
+                    self.after(0, lambda: loading_container.destroy())
                     self.after(0, lambda: self.populate_episodes(frame, episodes))
                 except Exception as e:
+                    self.after(0, lambda: loading_container.destroy())
                     self.after(0, lambda: self.log(f"Error loading episodes: {e}"))
 
             threading.Thread(target=load_episodes, daemon=True).start()
