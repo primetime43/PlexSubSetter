@@ -1360,17 +1360,8 @@ class PlexSubSetterApp(ctk.CTk):
 
         self.title("PlexSubSetter")
 
-        # Set window size and center it
-        window_width = 1200
-        window_height = 850
-        screen_width = self.winfo_screenwidth()
-        screen_height = self.winfo_screenheight()
-        x = (screen_width // 2) - (window_width // 2)
-        y = (screen_height // 2) - (window_height // 2)
-        self.geometry(f'{window_width}x{window_height}+{x}+{y}')
-
-        # Set minimum window size
-        self.minsize(1000, 750)
+        # Start with small default window (will be resized when showing frames)
+        self.geometry("500x600")
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -1404,6 +1395,14 @@ class PlexSubSetterApp(ctk.CTk):
         except:
             pass
 
+    def resize_and_center(self, width, height):
+        """Resize window and center it on screen."""
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x = (screen_width // 2) - (width // 2)
+        y = (screen_height // 2) - (height // 2)
+        self.geometry(f'{width}x{height}+{x}+{y}')
+
     def show_login(self):
         """Show login frame."""
         if self.is_closing:
@@ -1414,6 +1413,10 @@ class PlexSubSetterApp(ctk.CTk):
                 self.current_frame.destroy()
             except:
                 pass
+
+        # Resize for login (small window)
+        self.minsize(400, 500)
+        self.resize_and_center(500, 600)
 
         self.current_frame = LoginFrame(self, self.on_login_success)
         self.current_frame.grid(row=0, column=0, sticky="nsew")
@@ -1435,6 +1438,10 @@ class PlexSubSetterApp(ctk.CTk):
                 self.current_frame.destroy()
             except:
                 pass
+
+        # Resize for server selection (medium window)
+        self.minsize(600, 500)
+        self.resize_and_center(700, 600)
 
         self.current_frame = ServerSelectionFrame(self, self.account,
                                                   self.on_server_selected,
@@ -1458,6 +1465,10 @@ class PlexSubSetterApp(ctk.CTk):
                 self.current_frame.destroy()
             except:
                 pass
+
+        # Resize for main app (large window)
+        self.minsize(1000, 750)
+        self.resize_and_center(1200, 850)
 
         self.current_frame = MainAppFrame(self, self.plex, self.show_server_selection)
         self.current_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
