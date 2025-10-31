@@ -16,6 +16,8 @@ import os
 import sys
 import tempfile
 import webbrowser
+import logging
+from datetime import datetime
 from plexapi.myplex import MyPlexAccount, MyPlexPinLogin
 from plexapi.server import PlexServer
 from plexapi.video import Movie, Episode, Show, Season
@@ -28,6 +30,36 @@ from babelfish import Language
 # Set appearance and theme
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
+
+# Set up logging
+def setup_logging():
+    """Configure logging to file and console."""
+    # Create logs directory if it doesn't exist
+    log_dir = "logs"
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+
+    # Create log filename with timestamp
+    log_filename = os.path.join(log_dir, f"plexsubsetter_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_filename, encoding='utf-8'),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+
+    logging.info("="*80)
+    logging.info(f"PlexSubSetter v{__version__} - Session Started")
+    logging.info("="*80)
+
+    return log_filename
+
+# Initialize logging
+current_log_file = setup_logging()
 
 
 # Language mappings
@@ -293,8 +325,10 @@ class ServerSelectionFrame(ctk.CTkFrame):
         def connect_thread():
             try:
                 plex = resource.connect()
+                logging.info(f"Successfully connected to Plex server: {resource.name} ({resource.platform})")
                 self.after(0, lambda: self.on_server_selected(plex))
             except Exception as e:
+                logging.error(f"Failed to connect to server {resource.name}: {e}")
                 self.after(0, lambda: self.status_label.configure(
                     text=f"Failed to connect: {e}", text_color="red"))
 
@@ -639,6 +673,11 @@ class MainAppFrame(ctk.CTkFrame):
                                            border_width=1, anchor="w")
         self.log_toggle_btn.grid(row=0, column=0, sticky="w")
 
+        # Log file path label
+        log_file_label = ctk.CTkLabel(log_header, text=f"📄 Log file: {current_log_file}",
+                                      font=ctk.CTkFont(size=10), text_color="gray")
+        log_file_label.grid(row=0, column=1, sticky="w", padx=10)
+
         clear_btn = ctk.CTkButton(log_header, text="Clear", command=self.clear_log,
                                  width=60, height=24, fg_color="transparent")
         clear_btn.grid(row=0, column=2, sticky="e")
@@ -659,12 +698,28 @@ class MainAppFrame(ctk.CTkFrame):
         self.progress_bar.grid(row=6, column=0, sticky="ew", pady=(0, 0))
         self.progress_bar.grid_remove()
 
-    def log(self, message):
-        """Add message to log."""
+    def log(self, message, level="info"):
+        """Add message to log and write to file.
+
+        Args:
+            message (str): Message to log
+            level (str): Log level - "info", "warning", "error", "debug"
+        """
+        # Write to GUI log
         self.output_text.configure(state="normal")
         self.output_text.insert("end", message + "\n")
         self.output_text.see("end")
         self.output_text.configure(state="disabled")
+
+        # Write to file log based on level
+        if level == "error":
+            logging.error(message)
+        elif level == "warning":
+            logging.warning(message)
+        elif level == "debug":
+            logging.debug(message)
+        else:
+            logging.info(message)
 
     def clear_log(self):
         """Clear the output log."""
@@ -716,7 +771,7 @@ class MainAppFrame(ctk.CTkFrame):
                 self.safe_after(0, lambda: self.log(f"✓ Loaded {len(self.libraries)} libraries\n"))
 
             except Exception as e:
-                self.safe_after(0, lambda: self.log(f"✗ Error fetching libraries: {e}\n"))
+                self.safe_after(0, lambda err=str(e): self.log(f"✗ Error fetching libraries: {err}\n", level="error"))
 
         threading.Thread(target=refresh_thread, daemon=True).start()
 
@@ -938,7 +993,7 @@ class MainAppFrame(ctk.CTkFrame):
 
             except Exception as e:
                 self.safe_after(0, lambda: self.hide_browser_loading())
-                self.safe_after(0, lambda: self.log(f"✗ Error loading library: {e}\n"))
+                self.safe_after(0, lambda err=str(e): self.log(f"✗ Error loading library: {err}\n", level="error"))
 
         threading.Thread(target=load_thread, daemon=True).start()
 
@@ -2080,7 +2135,7 @@ class MainAppFrame(ctk.CTkFrame):
                     successful_items.append(item)
 
                 except Exception as e:
-                    self.log(f"Download error for {title}: {e}")
+                    self.log(f"Download error for {title}: {e}", level="error")
 
             # Refresh subtitle indicators for successful items
             if successful_items:
@@ -2209,7 +2264,7 @@ class MainAppFrame(ctk.CTkFrame):
                     f"✓ Dry run complete: {items_with_subs}/{len(items_missing_subs)} items have subtitles available"))
 
             except Exception as e:
-                self.log(f"✗ Dry run error: {e}")
+                self.log(f"✗ Dry run error: {e}", level="error")
                 self.safe_after(0, lambda: self.update_status(f"Error: {e}"))
 
             self.hide_progress()
@@ -2771,6 +2826,7 @@ class PlexSubSetterApp(ctk.CTk):
         """Handle successful login."""
         if self.is_closing:
             return
+        logging.info(f"User '{account.username}' logged in successfully")
         self.account = account
         self.show_server_selection()
 
