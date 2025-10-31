@@ -51,7 +51,9 @@ logs/
 build/
 dist/
 *.spec
+!PlexSubSetter.spec
 
 .claude/
 
 *.md
+!README.md
