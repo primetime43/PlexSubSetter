@@ -539,12 +539,6 @@ class MainAppFrame(ctk.CTkFrame):
                                     state="disabled")
         self.set_btn.grid(row=0, column=3, padx=5, pady=15, sticky="ew")
 
-        self.disable_btn = ctk.CTkButton(actions_frame, text="✗ Disable All",
-                                        command=self.disable_subtitles, height=32,
-                                        fg_color="#8b0000", hover_color="#6b0000",
-                                        state="disabled")
-        self.disable_btn.grid(row=1, column=1, columnspan=2, padx=5, pady=(0, 15), sticky="ew")
-
         # === SUBTITLE SELECTION PANEL ===
         self.selection_frame = ctk.CTkFrame(right_panel)
         self.selection_frame.grid(row=3, column=0, sticky="nsew", pady=10)
@@ -1715,41 +1709,6 @@ class MainAppFrame(ctk.CTkFrame):
 
         threading.Thread(target=task, daemon=True).start()
 
-    def disable_subtitles(self):
-        """Disable all subtitles."""
-        def task():
-            self.show_progress()
-            self.disable_action_buttons()
-
-            self.log("\n" + "="*60)
-            self.log("DISABLING SUBTITLES")
-            self.log("="*60)
-
-            items = self.get_video_items()
-            if not items:
-                self.log("✗ No items selected\n")
-                self.hide_progress()
-                self.enable_action_buttons()
-                return
-
-            self.log(f"Processing {len(items)} item(s)...\n")
-
-            for item in items:
-                title = self._get_item_title(item)
-                try:
-                    for media in item.media:
-                        for part in media.parts:
-                            part.resetSelectedSubtitleStream()
-                    self.log(f"✓ {title}")
-                except Exception as e:
-                    self.log(f"✗ {title} - {e}")
-
-            self.log("\n✓ Disabling completed\n")
-            self.hide_progress()
-            self.enable_action_buttons()
-
-        threading.Thread(target=task, daemon=True).start()
-
     def show_progress(self):
         """Show progress bar."""
         self.progress_bar.grid()
@@ -1766,7 +1725,6 @@ class MainAppFrame(ctk.CTkFrame):
         self.download_btn.configure(state="disabled")
         self.list_btn.configure(state="disabled")
         self.set_btn.configure(state="disabled")
-        self.disable_btn.configure(state="disabled")
         self.refresh_browser_btn.configure(state="disabled")
 
     def enable_action_buttons(self):
@@ -1775,7 +1733,6 @@ class MainAppFrame(ctk.CTkFrame):
         self.search_btn.configure(state=state)
         self.list_btn.configure(state=state)
         self.set_btn.configure(state=state)
-        self.disable_btn.configure(state=state)
 
         # Download button only enabled if we have search results
         download_state = "normal" if self.search_results else "disabled"
