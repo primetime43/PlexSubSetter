@@ -286,6 +286,7 @@ class MainAppFrame(ctk.CTkFrame):
         self.libraries = []
         self.selected_items = []  # Items selected for subtitle management
         self.current_library = None
+        self._is_destroyed = False
 
         # Configure grid - two column layout
         self.grid_columnconfigure(0, weight=0, minsize=380)  # Browser panel
@@ -294,6 +295,22 @@ class MainAppFrame(ctk.CTkFrame):
 
         self.create_widgets()
         self.refresh_libraries()
+
+    def destroy(self):
+        """Override destroy to set flag."""
+        self._is_destroyed = True
+        try:
+            super().destroy()
+        except:
+            pass
+
+    def safe_after(self, ms, func):
+        """Safely schedule a function call, checking if widget is destroyed."""
+        if not self._is_destroyed:
+            try:
+                self.after(ms, func)
+            except:
+                pass
 
     def create_widgets(self):
         """Create main application widgets."""
@@ -484,22 +501,25 @@ class MainAppFrame(ctk.CTkFrame):
         self.log("Fetching libraries...")
 
         def refresh_thread():
+            if self._is_destroyed:
+                return
+
             try:
                 self.libraries = []
                 for section in self.plex.library.sections():
                     self.libraries.append(section)
-                    self.after(0, lambda s=section: self.log(f"  Found: {s.title} (Type: {s.type})"))
+                    self.safe_after(0, lambda s=section: self.log(f"  Found: {s.title} (Type: {s.type})"))
 
                 lib_names = [lib.title for lib in self.libraries]
-                self.after(0, lambda: self.library_combo.configure(values=lib_names))
+                self.safe_after(0, lambda: self.library_combo.configure(values=lib_names))
                 if lib_names:
-                    self.after(0, lambda: self.library_combo.set(lib_names[0]))
-                    self.after(0, lambda: self.load_library_content())
+                    self.safe_after(0, lambda: self.library_combo.set(lib_names[0]))
+                    self.safe_after(0, lambda: self.load_library_content())
 
-                self.after(0, lambda: self.log(f"✓ Loaded {len(self.libraries)} libraries\n"))
+                self.safe_after(0, lambda: self.log(f"✓ Loaded {len(self.libraries)} libraries\n"))
 
             except Exception as e:
-                self.after(0, lambda: self.log(f"✗ Error fetching libraries: {e}\n"))
+                self.safe_after(0, lambda: self.log(f"✗ Error fetching libraries: {e}\n"))
 
         threading.Thread(target=refresh_thread, daemon=True).start()
 
@@ -546,26 +566,29 @@ class MainAppFrame(ctk.CTkFrame):
         self.show_browser_loading()
 
         def load_thread():
+            if self._is_destroyed:
+                return
+
             try:
                 self.current_library = next((lib for lib in self.libraries if lib.title == library_name), None)
                 if not self.current_library:
-                    self.after(0, self.hide_browser_loading)
+                    self.safe_after(0, self.hide_browser_loading)
                     return
 
                 if self.current_library.type == 'movie':
                     movies = self.current_library.all()
-                    self.after(0, lambda: self.hide_browser_loading())
-                    self.after(0, lambda: self.populate_movies(movies))
+                    self.safe_after(0, lambda: self.hide_browser_loading())
+                    self.safe_after(0, lambda: self.populate_movies(movies))
                 elif self.current_library.type == 'show':
                     shows = self.current_library.all()
-                    self.after(0, lambda: self.hide_browser_loading())
-                    self.after(0, lambda: self.populate_shows(shows))
+                    self.safe_after(0, lambda: self.hide_browser_loading())
+                    self.safe_after(0, lambda: self.populate_shows(shows))
 
-                self.after(0, lambda: self.log(f"✓ Loaded {library_name}\n"))
+                self.safe_after(0, lambda: self.log(f"✓ Loaded {library_name}\n"))
 
             except Exception as e:
-                self.after(0, lambda: self.hide_browser_loading())
-                self.after(0, lambda: self.log(f"✗ Error loading library: {e}\n"))
+                self.safe_after(0, lambda: self.hide_browser_loading())
+                self.safe_after(0, lambda: self.log(f"✗ Error loading library: {e}\n"))
 
         threading.Thread(target=load_thread, daemon=True).start()
 
@@ -643,14 +666,16 @@ class MainAppFrame(ctk.CTkFrame):
 
             # Load seasons in thread
             def load_seasons():
+                if self._is_destroyed:
+                    return
                 try:
                     seasons = show.seasons()
                     # Remove loading indicator before populating
-                    self.after(0, lambda: loading_container.destroy())
-                    self.after(0, lambda: self.populate_seasons(frame, seasons))
+                    self.safe_after(0, lambda: loading_container.destroy())
+                    self.safe_after(0, lambda: self.populate_seasons(frame, seasons))
                 except Exception as e:
-                    self.after(0, lambda: loading_container.destroy())
-                    self.after(0, lambda: self.log(f"Error loading seasons: {e}"))
+                    self.safe_after(0, lambda: loading_container.destroy())
+                    self.safe_after(0, lambda: self.log(f"Error loading seasons: {e}"))
 
             threading.Thread(target=load_seasons, daemon=True).start()
 
@@ -705,14 +730,16 @@ class MainAppFrame(ctk.CTkFrame):
 
             # Load episodes in thread
             def load_episodes():
+                if self._is_destroyed:
+                    return
                 try:
                     episodes = season.episodes()
                     # Remove loading indicator before populating
-                    self.after(0, lambda: loading_container.destroy())
-                    self.after(0, lambda: self.populate_episodes(frame, episodes))
+                    self.safe_after(0, lambda: loading_container.destroy())
+                    self.safe_after(0, lambda: self.populate_episodes(frame, episodes))
                 except Exception as e:
-                    self.after(0, lambda: loading_container.destroy())
-                    self.after(0, lambda: self.log(f"Error loading episodes: {e}"))
+                    self.safe_after(0, lambda: loading_container.destroy())
+                    self.safe_after(0, lambda: self.log(f"Error loading episodes: {e}"))
 
             threading.Thread(target=load_episodes, daemon=True).start()
 
@@ -742,6 +769,8 @@ class MainAppFrame(ctk.CTkFrame):
     def on_show_selected(self, show, var):
         """Handle show selection (selects all episodes)."""
         def load_and_select():
+            if self._is_destroyed:
+                return
             try:
                 episodes = show.episodes()
                 if var.get():
@@ -752,15 +781,17 @@ class MainAppFrame(ctk.CTkFrame):
                     for ep in episodes:
                         if ep in self.selected_items:
                             self.selected_items.remove(ep)
-                self.after(0, self.update_selection_label)
+                self.safe_after(0, self.update_selection_label)
             except Exception as e:
-                self.after(0, lambda: self.log(f"Error: {e}"))
+                self.safe_after(0, lambda: self.log(f"Error: {e}"))
 
         threading.Thread(target=load_and_select, daemon=True).start()
 
     def on_season_selected(self, season, var):
         """Handle season selection (selects all episodes in season)."""
         def load_and_select():
+            if self._is_destroyed:
+                return
             try:
                 episodes = season.episodes()
                 if var.get():
@@ -771,9 +802,9 @@ class MainAppFrame(ctk.CTkFrame):
                     for ep in episodes:
                         if ep in self.selected_items:
                             self.selected_items.remove(ep)
-                self.after(0, self.update_selection_label)
+                self.safe_after(0, self.update_selection_label)
             except Exception as e:
-                self.after(0, lambda: self.log(f"Error: {e}"))
+                self.safe_after(0, lambda: self.log(f"Error: {e}"))
 
         threading.Thread(target=load_and_select, daemon=True).start()
 
@@ -783,6 +814,8 @@ class MainAppFrame(ctk.CTkFrame):
             return
 
         def load_and_select():
+            if self._is_destroyed:
+                return
             try:
                 self.selected_items.clear()
                 if self.current_library.type == 'movie':
@@ -793,10 +826,10 @@ class MainAppFrame(ctk.CTkFrame):
                     for show in shows:
                         episodes = show.episodes()
                         self.selected_items.extend(episodes)
-                self.after(0, self.update_selection_label)
-                self.after(0, lambda: self.log("✓ Selected all items\n"))
+                self.safe_after(0, self.update_selection_label)
+                self.safe_after(0, lambda: self.log("✓ Selected all items\n"))
             except Exception as e:
-                self.after(0, lambda: self.log(f"Error: {e}"))
+                self.safe_after(0, lambda: self.log(f"Error: {e}"))
 
         threading.Thread(target=load_and_select, daemon=True).start()
 
@@ -1064,27 +1097,63 @@ class PlexSubSetterApp(ctk.CTk):
         self.current_frame = None
         self.account = None
         self.plex = None
+        self.is_closing = False
+
+        # Handle window close event
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
         # Show login frame
         self.show_login()
 
+    def on_closing(self):
+        """Handle application closing."""
+        self.is_closing = True
+
+        # Clean up current frame properly
+        if self.current_frame:
+            try:
+                self.current_frame.destroy()
+            except:
+                pass
+
+        # Destroy the window
+        try:
+            self.quit()
+            self.destroy()
+        except:
+            pass
+
     def show_login(self):
         """Show login frame."""
+        if self.is_closing:
+            return
+
         if self.current_frame:
-            self.current_frame.destroy()
+            try:
+                self.current_frame.destroy()
+            except:
+                pass
 
         self.current_frame = LoginFrame(self, self.on_login_success)
         self.current_frame.grid(row=0, column=0, sticky="nsew")
 
     def on_login_success(self, account):
         """Handle successful login."""
+        if self.is_closing:
+            return
         self.account = account
         self.show_server_selection()
 
     def show_server_selection(self):
         """Show server selection frame."""
+        if self.is_closing:
+            return
+
         if self.current_frame:
-            self.current_frame.destroy()
+            try:
+                self.current_frame.destroy()
+            except:
+                pass
 
         self.current_frame = ServerSelectionFrame(self, self.account,
                                                   self.on_server_selected,
@@ -1093,13 +1162,21 @@ class PlexSubSetterApp(ctk.CTk):
 
     def on_server_selected(self, plex):
         """Handle server selection."""
+        if self.is_closing:
+            return
         self.plex = plex
         self.show_main_app()
 
     def show_main_app(self):
         """Show main application."""
+        if self.is_closing:
+            return
+
         if self.current_frame:
-            self.current_frame.destroy()
+            try:
+                self.current_frame.destroy()
+            except:
+                pass
 
         self.current_frame = MainAppFrame(self, self.plex, self.show_server_selection)
         self.current_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
