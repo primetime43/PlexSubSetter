@@ -26,6 +26,14 @@ from subliminal.video import Episode as SubliminalEpisode, Movie as SubliminalMo
 from subliminal.providers.opensubtitles import OpenSubtitlesProvider
 from babelfish import Language
 
+# Import error handling framework
+from error_handling import (
+    PlexConnectionError, PlexAuthenticationError, LibraryNotFoundError,
+    SubtitleSearchError, SubtitleDownloadError, FileAccessError,
+    retry_with_backoff, ErrorMessageFormatter, CrashReporter,
+    safe_execute, ErrorContext, get_crash_reporter
+)
+
 
 # Set appearance and theme
 ctk.set_appearance_mode("dark")
@@ -320,18 +328,51 @@ class ServerSelectionFrame(ctk.CTkFrame):
         threading.Thread(target=load_thread, daemon=True).start()
 
     def connect_to_server(self, resource):
-        """Connect to selected server."""
+        """Connect to selected server with retry logic."""
         self.status_label.configure(text=f"Connecting to {resource.name}...", text_color="yellow")
+
+        def on_retry_callback(func, attempt, error):
+            """Update UI during retry attempts."""
+            self.after(0, lambda: self.status_label.configure(
+                text=f"Connecting to {resource.name}... (attempt {attempt}/3)",
+                text_color="yellow"))
+
+        @retry_with_backoff(
+            max_attempts=3,
+            initial_delay=1.0,
+            exceptions=(Exception,),
+            on_retry=on_retry_callback
+        )
+        def connect_with_retry():
+            """Connect to Plex server with automatic retry."""
+            try:
+                plex = resource.connect()
+                return plex
+            except ConnectionError as e:
+                raise PlexConnectionError(resource.name, e)
+            except Exception as e:
+                # Check if it's an authentication error
+                if "unauthorized" in str(e).lower() or "401" in str(e):
+                    raise PlexAuthenticationError(e)
+                raise PlexConnectionError(resource.name, e)
 
         def connect_thread():
             try:
-                plex = resource.connect()
-                logging.info(f"Successfully connected to Plex server: {resource.name} ({resource.platform})")
-                self.after(0, lambda: self.on_server_selected(plex))
+                with ErrorContext("server connection", get_crash_reporter()):
+                    plex = connect_with_retry()
+                    logging.info(f"Successfully connected to Plex server: {resource.name} ({resource.platform})")
+                    self.after(0, lambda: self.on_server_selected(plex))
+            except (PlexConnectionError, PlexAuthenticationError) as e:
+                error_msg = ErrorMessageFormatter.format_plex_error(e.original_error or e, f"server {resource.name}")
+                logging.error(error_msg)
+                self.after(0, lambda msg=error_msg: self.status_label.configure(
+                    text=msg, text_color="red"))
             except Exception as e:
-                logging.error(f"Failed to connect to server {resource.name}: {e}")
+                error_msg = f"Unexpected error connecting to {resource.name}: {e}"
+                logging.error(error_msg)
+                get_crash_reporter().report_crash(e, {"server": resource.name, "action": "connect"})
                 self.after(0, lambda: self.status_label.configure(
-                    text=f"Failed to connect: {e}", text_color="red"))
+                    text=error_msg, text_color="red"))
 
         threading.Thread(target=connect_thread, daemon=True).start()
 
@@ -759,29 +800,56 @@ class MainAppFrame(ctk.CTkFrame):
         self.update_status("Ready")
 
     def refresh_libraries(self):
-        """Refresh library list."""
+        """Refresh library list with error handling."""
         self.log("Fetching libraries...")
 
-        def refresh_thread():
+        @retry_with_backoff(max_attempts=2, initial_delay=2.0, exceptions=(Exception,))
+        def fetch_libraries():
+            """Fetch libraries with retry."""
             if self._is_destroyed:
-                return
+                return []
 
             try:
-                self.libraries = []
+                libraries = []
                 for section in self.plex.library.sections():
-                    self.libraries.append(section)
-                    self.safe_after(0, lambda s=section: self.log(f"  Found: {s.title} (Type: {s.type})"))
-
-                lib_names = [lib.title for lib in self.libraries]
-                self.safe_after(0, lambda: self.library_combo.configure(values=lib_names))
-                if lib_names:
-                    self.safe_after(0, lambda: self.library_combo.set("Select a library..."))
-                    # Don't auto-load library - let user choose
-
-                self.safe_after(0, lambda: self.log(f"✓ Loaded {len(self.libraries)} libraries - Select one to begin\n"))
-
+                    libraries.append(section)
+                return libraries
+            except ConnectionError as e:
+                raise PlexConnectionError(original_error=e)
             except Exception as e:
-                self.safe_after(0, lambda err=str(e): self.log(f"✗ Error fetching libraries: {err}\n", level="error"))
+                if "unauthorized" in str(e).lower():
+                    raise PlexAuthenticationError(e)
+                raise
+
+        def refresh_thread():
+            try:
+                with ErrorContext("library refresh", get_crash_reporter()):
+                    self.libraries = fetch_libraries()
+
+                    # Log found libraries
+                    for section in self.libraries:
+                        self.safe_after(0, lambda s=section: self.log(f"  Found: {s.title} (Type: {s.type})"))
+
+                    lib_names = [lib.title for lib in self.libraries]
+                    self.safe_after(0, lambda: self.library_combo.configure(values=lib_names))
+
+                    if lib_names:
+                        self.safe_after(0, lambda: self.library_combo.set("Select a library..."))
+                        # Don't auto-load library - let user choose
+                        self.safe_after(0, lambda: self.log(f"✓ Loaded {len(self.libraries)} libraries - Select one to begin\n"))
+                    else:
+                        self.safe_after(0, lambda: self.log("⚠ No libraries found\n", level="warning"))
+
+            except (PlexConnectionError, PlexAuthenticationError) as e:
+                error_msg = str(e)
+                logging.error(error_msg)
+                self.safe_after(0, lambda: self.log(f"✗ {error_msg}\n", level="error"))
+                self.safe_after(0, lambda: self.update_status("Failed to load libraries - check connection"))
+            except Exception as e:
+                error_msg = f"Unexpected error fetching libraries: {e}"
+                logging.error(error_msg)
+                get_crash_reporter().report_crash(e, {"action": "refresh_libraries"})
+                self.safe_after(0, lambda: self.log(f"✗ {error_msg}\n", level="error"))
 
         threading.Thread(target=refresh_thread, daemon=True).start()
 
