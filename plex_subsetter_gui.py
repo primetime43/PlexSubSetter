@@ -306,6 +306,7 @@ class MainAppFrame(ctk.CTkFrame):
         self.search_text = ctk.StringVar()
         self.search_text.trace_add("write", lambda *args: self.filter_items())
         self.search_results = {}  # Store search results: {item: [subtitles]}
+        self.subtitle_status_cache = {}  # Cache subtitle status: {item_id: has_subs}
 
         # Configure subliminal cache (based on rustitles approach)
         try:
@@ -373,9 +374,23 @@ class MainAppFrame(ctk.CTkFrame):
                                             command=self.on_library_change, state="readonly")
         self.library_combo.grid(row=0, column=0, sticky="ew", pady=(0, 5))
 
-        self.refresh_browser_btn = ctk.CTkButton(lib_select_frame, text="🔄 Reload Library",
+        # Buttons row
+        buttons_row = ctk.CTkFrame(lib_select_frame, fg_color="transparent")
+        buttons_row.grid(row=1, column=0, sticky="ew")
+        buttons_row.grid_columnconfigure(0, weight=1)
+        buttons_row.grid_columnconfigure(1, weight=1)
+
+        self.refresh_browser_btn = ctk.CTkButton(buttons_row, text="🔄 Reload",
                                                 command=self.load_library_content, height=28)
-        self.refresh_browser_btn.grid(row=1, column=0, sticky="ew")
+        self.refresh_browser_btn.grid(row=0, column=0, sticky="ew", padx=(0, 3))
+
+        self.refresh_status_btn = ctk.CTkButton(buttons_row, text="↻ Status",
+                                               command=lambda: threading.Thread(
+                                                   target=lambda: self.safe_after(0, self.refresh_subtitle_indicators),
+                                                   daemon=True).start(),
+                                               height=28, fg_color="transparent",
+                                               border_width=2)
+        self.refresh_status_btn.grid(row=0, column=1, sticky="ew", padx=(3, 0))
 
         # Search/Filter bar
         search_frame = ctk.CTkFrame(browser_panel, fg_color="transparent")
@@ -771,10 +786,23 @@ class MainAppFrame(ctk.CTkFrame):
             frame = ctk.CTkFrame(self.browser_scroll, fg_color="transparent")
             frame.pack(fill="x", pady=2, padx=5)
 
+            # Add subtitle status indicator
+            has_subs = self.check_has_subtitles(movie)
+            status_icon = "✓" if has_subs else "✗"
+            status_color = "#2d7a2d" if has_subs else "#8b0000"
+
+            status_label = ctk.CTkLabel(frame, text=status_icon, width=20,
+                                       text_color=status_color, font=ctk.CTkFont(size=14, weight="bold"))
+            status_label.pack(side="left", padx=(0, 5))
+
             cb = ctk.CTkCheckBox(frame, text=f"{movie.title} ({movie.year})",
                                 variable=var,
                                 command=lambda m=movie, v=var: self.on_item_selected(m, v))
             cb.pack(side="left", fill="x", expand=True)
+
+            # Store references for updating status
+            frame.status_label = status_label
+            frame.item_obj = movie
 
             # Store frame for filtering
             self.top_level_frames.append(frame)
@@ -960,11 +988,24 @@ class MainAppFrame(ctk.CTkFrame):
             ep_frame = ctk.CTkFrame(episode_container, fg_color="transparent")
             ep_frame.pack(fill="x", pady=1)
 
+            # Add subtitle status indicator
+            has_subs = self.check_has_subtitles(episode)
+            status_icon = "✓" if has_subs else "✗"
+            status_color = "#2d7a2d" if has_subs else "#8b0000"
+
+            status_label = ctk.CTkLabel(ep_frame, text=status_icon, width=20,
+                                       text_color=status_color, font=ctk.CTkFont(size=12, weight="bold"))
+            status_label.pack(side="left", padx=(5, 5))
+
             ep_cb = ctk.CTkCheckBox(ep_frame,
                                    text=f"E{episode.index:02d} - {episode.title}",
                                    variable=episode_var,
                                    command=lambda e=episode, v=episode_var: self.on_item_selected(e, v))
-            ep_cb.pack(anchor="w", padx=(5, 0))
+            ep_cb.pack(side="left", anchor="w", fill="x", expand=True)
+
+            # Store references for updating status
+            ep_frame.status_label = status_label
+            ep_frame.item_obj = episode
 
             # Store references to checkbox and variable
             season_frame.episode_checkboxes.append(ep_cb)
@@ -1214,6 +1255,72 @@ class MainAppFrame(ctk.CTkFrame):
         # Run in thread to avoid blocking UI
         threading.Thread(target=check_status, daemon=True).start()
 
+    def check_has_subtitles(self, item, force_refresh=False):
+        """Check if an item has subtitles (fast check, uses cache)."""
+        item_id = item.ratingKey
+
+        # Return cached result if available (unless forced refresh)
+        if not force_refresh and item_id in self.subtitle_status_cache:
+            return self.subtitle_status_cache[item_id]
+
+        # Reload item to get fresh subtitle data from server
+        try:
+            item.reload()
+        except:
+            pass  # If reload fails, continue with existing data
+
+        # Check subtitle status
+        try:
+            for media in item.media:
+                for part in media.parts:
+                    subs = part.subtitleStreams()
+                    if subs:
+                        self.subtitle_status_cache[item_id] = True
+                        return True
+        except:
+            pass
+
+        self.subtitle_status_cache[item_id] = False
+        return False
+
+    def refresh_subtitle_indicators(self, items_to_refresh=None):
+        """Refresh subtitle status indicators in the browser."""
+        def update_indicator(frame):
+            if not hasattr(frame, 'status_label') or not hasattr(frame, 'item_obj'):
+                return
+
+            item = frame.item_obj
+            has_subs = self.check_has_subtitles(item, force_refresh=True)
+
+            # Update indicator
+            status_icon = "✓" if has_subs else "✗"
+            status_color = "#2d7a2d" if has_subs else "#8b0000"
+            frame.status_label.configure(text=status_icon, text_color=status_color)
+
+        # If specific items provided, only refresh those
+        if items_to_refresh:
+            item_ids = {item.ratingKey for item in items_to_refresh}
+
+            # Search through browser for matching frames
+            for widget in self.browser_scroll.winfo_children():
+                if hasattr(widget, 'item_obj') and widget.item_obj.ratingKey in item_ids:
+                    update_indicator(widget)
+                # Check nested episode frames
+                for child in widget.winfo_children():
+                    for subchild in child.winfo_children():
+                        if hasattr(subchild, 'item_obj') and subchild.item_obj.ratingKey in item_ids:
+                            update_indicator(subchild)
+        else:
+            # Refresh all indicators
+            for widget in self.browser_scroll.winfo_children():
+                if hasattr(widget, 'item_obj'):
+                    update_indicator(widget)
+                # Check nested episode frames
+                for child in widget.winfo_children():
+                    for subchild in child.winfo_children():
+                        if hasattr(subchild, 'item_obj'):
+                            update_indicator(subchild)
+
     def get_video_items(self):
         """Get selected video items."""
         return self.selected_items
@@ -1422,6 +1529,7 @@ class MainAppFrame(ctk.CTkFrame):
             self.log(f"Downloading subtitles for {len(self.search_results)} item(s)...\n")
 
             success_count = 0
+            successful_items = []  # Track items that successfully got subtitles
             for item, subs_list in self.search_results.items():
                 title = self._get_item_title(item)
                 try:
@@ -1482,11 +1590,27 @@ class MainAppFrame(ctk.CTkFrame):
 
                     self.log(f"  ✓ Downloaded and uploaded to Plex")
                     success_count += 1
+                    successful_items.append(item)
 
                 except Exception as e:
                     self.log(f"  ✗ Error: {e}")
 
-            self.log(f"\n✓ Download completed - {success_count}/{len(self.search_results)} successful\n")
+            self.log(f"\n✓ Download completed - {success_count}/{len(self.search_results)} successful")
+
+            # Refresh subtitle indicators for successful items
+            if successful_items:
+                self.log("🔄 Refreshing subtitle indicators...")
+                # Reload items to get fresh subtitle data
+                for item in successful_items:
+                    try:
+                        item.reload()
+                    except:
+                        pass
+                self.safe_after(0, lambda: self.refresh_subtitle_indicators(successful_items))
+                self.log("✓ Indicators refreshed\n")
+            else:
+                self.log("")
+
             self.hide_progress()
             self.enable_action_buttons()
 
