@@ -775,10 +775,10 @@ class MainAppFrame(ctk.CTkFrame):
                 lib_names = [lib.title for lib in self.libraries]
                 self.safe_after(0, lambda: self.library_combo.configure(values=lib_names))
                 if lib_names:
-                    self.safe_after(0, lambda: self.library_combo.set(lib_names[0]))
-                    self.safe_after(0, lambda: self.load_library_content())
+                    self.safe_after(0, lambda: self.library_combo.set("Select a library..."))
+                    # Don't auto-load library - let user choose
 
-                self.safe_after(0, lambda: self.log(f"✓ Loaded {len(self.libraries)} libraries\n"))
+                self.safe_after(0, lambda: self.log(f"✓ Loaded {len(self.libraries)} libraries - Select one to begin\n"))
 
             except Exception as e:
                 self.safe_after(0, lambda err=str(e): self.log(f"✗ Error fetching libraries: {err}\n", level="error"))
@@ -970,7 +970,7 @@ class MainAppFrame(ctk.CTkFrame):
     def load_library_content(self):
         """Load content from selected library into browser."""
         library_name = self.library_combo.get()
-        if not library_name:
+        if not library_name or library_name == "Select a library...":
             return
 
         self.log(f"Loading {library_name}...")
