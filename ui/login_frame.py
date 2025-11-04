@@ -6,7 +6,11 @@ import customtkinter as ctk
 import threading
 import webbrowser
 from plexapi.myplex import MyPlexAccount, MyPlexPinLogin
-from utils.constants import __version__, __author__, __repo__, OAUTH_LOGIN_TIMEOUT
+from utils.constants import (
+    __version__, __author__, __repo__, OAUTH_LOGIN_TIMEOUT,
+    COLOR_PLEX_GOLD, COLOR_PLEX_GOLD_HOVER, COLOR_LINK_BLUE,
+    COLOR_GRAY, COLOR_STATUS_YELLOW
+)
 
 
 class LoginFrame(ctk.CTkFrame):
@@ -32,7 +36,7 @@ class LoginFrame(ctk.CTkFrame):
         title.grid(row=0, column=0, pady=(60, 10), padx=20)
 
         subtitle = ctk.CTkLabel(self, text="Mass Subtitle Manager for Plex",
-                               font=ctk.CTkFont(size=14), text_color="gray")
+                               font=ctk.CTkFont(size=14), text_color=COLOR_GRAY)
         subtitle.grid(row=1, column=0, pady=(0, 50), padx=20)
 
         # Login container
@@ -51,8 +55,8 @@ class LoginFrame(ctk.CTkFrame):
             command=self.start_oauth_login,
             height=50,
             font=ctk.CTkFont(size=16, weight="bold"),
-            fg_color="#e5a00d",
-            hover_color="#cc8f0c"
+            fg_color=COLOR_PLEX_GOLD,
+            hover_color=COLOR_PLEX_GOLD_HOVER
         )
         self.login_btn.grid(row=1, column=0, pady=(0, 15), sticky="ew", padx=60)
 
@@ -63,7 +67,7 @@ class LoginFrame(ctk.CTkFrame):
         # Info label
         info_text = "You'll be redirected to Plex.tv to sign in securely.\nNo credentials are stored in this application."
         info_label = ctk.CTkLabel(self, text=info_text, font=ctk.CTkFont(size=11),
-                                 text_color="gray", wraplength=400)
+                                 text_color=COLOR_GRAY, wraplength=400)
         info_label.grid(row=3, column=0, pady=(40, 20))
 
         # Footer with version, author, and repo link
@@ -71,24 +75,24 @@ class LoginFrame(ctk.CTkFrame):
         footer_frame.grid(row=4, column=0, pady=(10, 40))
 
         version_label = ctk.CTkLabel(footer_frame, text=f"Version {__version__}",
-                                     font=ctk.CTkFont(size=10), text_color="gray")
+                                     font=ctk.CTkFont(size=10), text_color=COLOR_GRAY)
         version_label.pack(pady=(0, 5))
 
         author_label = ctk.CTkLabel(footer_frame, text=f"Created by {__author__}",
-                                    font=ctk.CTkFont(size=10), text_color="gray")
+                                    font=ctk.CTkFont(size=10), text_color=COLOR_GRAY)
         author_label.pack(pady=(0, 5))
 
         # Clickable repository link
         repo_label = ctk.CTkLabel(footer_frame, text="View on GitHub",
                                   font=ctk.CTkFont(size=10, underline=True),
-                                  text_color="#58a6ff", cursor="hand2")
+                                  text_color=COLOR_LINK_BLUE, cursor="hand2")
         repo_label.pack()
         repo_label.bind("<Button-1>", lambda e: webbrowser.open(__repo__))
 
     def start_oauth_login(self):
         """Start the OAuth login process."""
         self.login_btn.configure(state="disabled", text="Opening browser...")
-        self.status_label.configure(text="Opening your browser for authentication...", text_color="yellow")
+        self.status_label.configure(text="Opening your browser for authentication...", text_color=COLOR_STATUS_YELLOW)
 
         def oauth_thread():
             """Background thread to handle OAuth authentication process."""
@@ -102,7 +106,7 @@ class LoginFrame(ctk.CTkFrame):
                 # Update UI
                 self.after(0, lambda: self.status_label.configure(
                     text="✓ Browser opened! Please sign in to Plex...\n\nWaiting for authentication...",
-                    text_color="#e5a00d"
+                    text_color=COLOR_PLEX_GOLD
                 ))
                 self.after(0, lambda: self.login_btn.configure(text="Waiting for sign in..."))
 

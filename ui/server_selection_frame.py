@@ -13,7 +13,10 @@ from error_handling import (
     ErrorMessageFormatter,
     get_crash_reporter
 )
-from utils.constants import CRITICAL_RETRY_ATTEMPTS, CRITICAL_RETRY_DELAY
+from utils.constants import (
+    CRITICAL_RETRY_ATTEMPTS, CRITICAL_RETRY_DELAY,
+    COLOR_STATUS_GREEN, COLOR_STATUS_RED, COLOR_STATUS_YELLOW
+)
 
 
 class ServerSelectionFrame(ctk.CTkFrame):
@@ -113,7 +116,7 @@ class ServerSelectionFrame(ctk.CTkFrame):
 
                         # Status and presence
                         status = "🟢 Online" if res.presence else "🔴 Offline"
-                        status_color = "#2ecc71" if res.presence else "#e74c3c"  # Green if online, red if offline
+                        status_color = COLOR_STATUS_GREEN if res.presence else COLOR_STATUS_RED
                         status_label = ctk.CTkLabel(card, text=status, anchor="w", text_color=status_color)
                         status_label.grid(row=1, column=0, sticky="w", padx=15, pady=(0, 5))
 
@@ -139,13 +142,13 @@ class ServerSelectionFrame(ctk.CTkFrame):
 
     def connect_to_server(self, resource):
         """Connect to selected server with retry logic."""
-        self.status_label.configure(text=f"Connecting to {resource.name}...", text_color="yellow")
+        self.status_label.configure(text=f"Connecting to {resource.name}...", text_color=COLOR_STATUS_YELLOW)
 
         def on_retry_callback(func, attempt, error):
             """Update UI during retry attempts."""
             self.after(0, lambda: self.status_label.configure(
                 text=f"Connecting to {resource.name}... (attempt {attempt}/{CRITICAL_RETRY_ATTEMPTS})",
-                text_color="yellow"))
+                text_color=COLOR_STATUS_YELLOW))
 
         @retry_with_backoff(
             max_attempts=CRITICAL_RETRY_ATTEMPTS,

@@ -14,7 +14,12 @@ from ui.server_selection_frame import ServerSelectionFrame
 from ui.main_app_frame import MainAppFrame
 
 # Import utilities
-from utils.constants import __version__, __author__, __repo__
+from utils.constants import (
+    __version__, __author__, __repo__,
+    WINDOW_LOGIN_MIN_WIDTH, WINDOW_LOGIN_MIN_HEIGHT, WINDOW_LOGIN_WIDTH, WINDOW_LOGIN_HEIGHT,
+    WINDOW_SERVER_MIN_WIDTH, WINDOW_SERVER_MIN_HEIGHT, WINDOW_SERVER_WIDTH, WINDOW_SERVER_HEIGHT,
+    WINDOW_MAIN_MIN_WIDTH, WINDOW_MAIN_MIN_HEIGHT, WINDOW_MAIN_WIDTH, WINDOW_MAIN_HEIGHT
+)
 from utils.logging_config import setup_logging
 
 
@@ -92,8 +97,8 @@ class PlexSubSetterApp(ctk.CTk):
                 logging.debug(f"Error destroying frame in show_login: {e}")
 
         # Resize for login (small window)
-        self.minsize(400, 500)
-        self.resize_and_center(500, 600)
+        self.minsize(WINDOW_LOGIN_MIN_WIDTH, WINDOW_LOGIN_MIN_HEIGHT)
+        self.resize_and_center(WINDOW_LOGIN_WIDTH, WINDOW_LOGIN_HEIGHT)
 
         self.current_frame = LoginFrame(self, self.on_login_success)
         self.current_frame.grid(row=0, column=0, sticky="nsew")
@@ -119,8 +124,8 @@ class PlexSubSetterApp(ctk.CTk):
                 logging.debug(f"Error destroying frame in show_server_selection: {e}")
 
         # Resize for server selection (medium window)
-        self.minsize(600, 500)
-        self.resize_and_center(700, 600)
+        self.minsize(WINDOW_SERVER_MIN_WIDTH, WINDOW_SERVER_MIN_HEIGHT)
+        self.resize_and_center(WINDOW_SERVER_WIDTH, WINDOW_SERVER_HEIGHT)
 
         self.current_frame = ServerSelectionFrame(self, self.account,
                                                   self.on_server_selected,
@@ -147,8 +152,8 @@ class PlexSubSetterApp(ctk.CTk):
                 logging.debug(f"Error destroying frame in show_main_app: {e}")
 
         # Resize for main app (large window)
-        self.minsize(1000, 750)
-        self.resize_and_center(1200, 850)
+        self.minsize(WINDOW_MAIN_MIN_WIDTH, WINDOW_MAIN_MIN_HEIGHT)
+        self.resize_and_center(WINDOW_MAIN_WIDTH, WINDOW_MAIN_HEIGHT)
 
         self.current_frame = MainAppFrame(self, self.plex, self.show_server_selection, current_log_file)
         self.current_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
