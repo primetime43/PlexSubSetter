@@ -213,7 +213,16 @@ class LibraryBrowser:
         self.all_movies = movies
         self.all_shows = None
         self.current_page = 1
+
+        # Show filter buttons for movies
+        self.parent.filter_btn_frame.grid()
+        # Reset filter to "all"
+        self.set_subtitle_filter("all")
+
         self.load_movie_page(1)
+
+        # Start background caching of subtitle status for all movies
+        self.start_background_subtitle_cache()
 
     def load_movie_page(self, page_num):
         """Load a specific page of filtered movies."""
@@ -223,6 +232,32 @@ class LibraryBrowser:
             filtered_movies = [m for m in self.all_movies if search_term in m.title.lower()]
         else:
             filtered_movies = self.all_movies
+
+        # Apply subtitle status filter
+        subtitle_filter = getattr(self.parent, 'subtitle_status_filter', 'all')
+        if subtitle_filter != "all":
+            # Show progress for large libraries
+            total_to_check = len(filtered_movies)
+            if total_to_check > 100:
+                self.parent.update_status(f"Filtering {total_to_check} movies by subtitle status...")
+
+            # Filter by subtitle status - check all movies (use cache when available, skip reload for speed)
+            filtered_by_status = []
+            for i, movie in enumerate(filtered_movies):
+                # Use cached value if available, otherwise check existing data (don't reload)
+                has_subs = self.check_has_subtitles(movie, force_refresh=False, skip_reload=True)
+
+                if subtitle_filter == "missing" and not has_subs:
+                    filtered_by_status.append(movie)
+                elif subtitle_filter == "has" and has_subs:
+                    filtered_by_status.append(movie)
+
+                # Update progress every 50 items
+                if total_to_check > 100 and (i + 1) % 50 == 0:
+                    progress = int(((i + 1) / total_to_check) * 100)
+                    self.parent.update_status(f"Filtering... {progress}% ({i + 1}/{total_to_check})")
+
+            filtered_movies = filtered_by_status
 
         # Calculate pagination
         total_movies = len(filtered_movies)
@@ -302,7 +337,12 @@ class LibraryBrowser:
         self.update_pagination_controls(page_num, total_pages, start_idx, end_idx, total_movies, "movies")
 
         # Update filter status
-        if search_term:
+        if subtitle_filter != "all" and not search_term:
+            filter_desc = "without subtitles" if subtitle_filter == "missing" else "with subtitles"
+            self.parent.filter_status_label.configure(
+                text=f"Showing {len(filtered_movies)}/{len(self.all_movies)} movies {filter_desc}"
+            )
+        elif search_term:
             self.parent.filter_status_label.configure(
                 text=f"Page {page_num}/{total_pages} - {len(filtered_movies)}/{len(self.all_movies)} movies matching '{search_term}'"
             )
@@ -354,6 +394,14 @@ class LibraryBrowser:
         self.all_shows = shows
         self.all_movies = None
         self.current_page = 1
+
+        # Hide filter buttons for TV shows
+        self.parent.filter_btn_frame.grid_remove()
+        # Reset filter to "all"
+        self.parent.subtitle_status_filter = "all"
+        # Clear filter status label
+        self.parent.filter_status_label.configure(text="")
+
         self.load_show_page(1)
 
     def load_show_page(self, page_num):
@@ -756,13 +804,14 @@ class LibraryBrowser:
 
         threading.Thread(target=check_status, daemon=True).start()
 
-    def check_has_subtitles(self, item, force_refresh=False):
+    def check_has_subtitles(self, item, force_refresh=False, skip_reload=False):
         """
         Check if an item has subtitles.
 
         Args:
             item: Movie or Episode object
             force_refresh: If True, bypass cache and check Plex API
+            skip_reload: If True, don't reload item (use existing data for speed)
 
         Returns:
             bool: True if item has subtitles, False otherwise
@@ -777,12 +826,13 @@ class LibraryBrowser:
             self.subtitle_cache[item.ratingKey] = result  # Copy to local cache
             return result
 
-        # Reload item to get fresh subtitle data from Plex server
-        try:
-            item.reload()
-        except Exception as e:
-            logging.debug(f"Error reloading item for subtitle check: {e}")
-            # Continue with existing data if reload fails
+        # Reload item to get fresh subtitle data from Plex server (unless skipped)
+        if not skip_reload:
+            try:
+                item.reload()
+            except Exception as e:
+                logging.debug(f"Error reloading item for subtitle check: {e}")
+                # Continue with existing data if reload fails
 
         # Check Plex API
         try:
@@ -836,6 +886,49 @@ class LibraryBrowser:
         # Submit to thread pool
         self.thread_pool.submit(prefetch_task)
 
+    def start_background_subtitle_cache(self):
+        """Start background caching of subtitle status for all movies."""
+        if not self.all_movies:
+            return
+
+        def cache_task():
+            """Background task to cache subtitle status for all movies."""
+            try:
+                total_movies = len(self.all_movies)
+                cached_count = 0
+
+                logging.info(f"Starting background subtitle status cache for {total_movies} movies")
+
+                for i, movie in enumerate(self.all_movies):
+                    if self.parent._is_destroyed:
+                        return
+
+                    # Skip if already cached
+                    if movie.ratingKey in self.subtitle_cache:
+                        cached_count += 1
+                        continue
+
+                    # Check subtitle status (this will cache it)
+                    try:
+                        self.check_has_subtitles(movie, force_refresh=False)
+                        cached_count += 1
+
+                        # Update progress every 50 movies
+                        if (i + 1) % 50 == 0:
+                            progress_pct = int((cached_count / total_movies) * 100)
+                            logging.debug(f"Subtitle cache progress: {cached_count}/{total_movies} ({progress_pct}%)")
+                    except Exception as e:
+                        logging.debug(f"Error caching subtitle status for movie: {e}")
+                        continue
+
+                logging.info(f"Background subtitle status cache complete: {cached_count}/{total_movies} movies cached")
+
+            except Exception as e:
+                logging.error(f"Error in background subtitle cache: {e}")
+
+        # Submit to thread pool
+        self.thread_pool.submit(cache_task)
+
     def refresh_subtitle_indicators(self, items_to_refresh=None):
         """
         Refresh subtitle status indicators for items.
@@ -855,8 +948,8 @@ class LibraryBrowser:
             self.parent.subtitle_status_cache.clear()
 
         # Implementation note: This triggers a re-render of the browser
-        # by reloading the current library content
+        # by reloading the current page (not the entire library)
         if self.all_movies:
-            self.populate_movies(self.all_movies)
+            self.load_movie_page(self.current_page)
         elif self.all_shows:
-            self.populate_shows(self.all_shows)
+            self.load_show_page(self.current_page)
