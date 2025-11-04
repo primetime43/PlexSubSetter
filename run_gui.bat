@@ -1,7 +1,7 @@
 @echo off
 REM PlexSubSetter GUI Launcher for Windows
 
-python plex_subsetter_gui.py
+python app.py
 
 if errorlevel 1 (
     echo.
