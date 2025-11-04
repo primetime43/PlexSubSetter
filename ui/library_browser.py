@@ -777,6 +777,13 @@ class LibraryBrowser:
             self.subtitle_cache[item.ratingKey] = result  # Copy to local cache
             return result
 
+        # Reload item to get fresh subtitle data from Plex server
+        try:
+            item.reload()
+        except Exception as e:
+            logging.debug(f"Error reloading item for subtitle check: {e}")
+            # Continue with existing data if reload fails
+
         # Check Plex API
         try:
             for media in item.media:
@@ -836,6 +843,17 @@ class LibraryBrowser:
         Args:
             items_to_refresh: List of items to refresh, or None to refresh all visible items
         """
+        # Clear cache for items that need refreshing
+        if items_to_refresh:
+            for item in items_to_refresh:
+                # Clear from both local and parent cache
+                self.subtitle_cache.pop(item.ratingKey, None)
+                self.parent.subtitle_status_cache.pop(item.ratingKey, None)
+        else:
+            # Clear all caches if refreshing everything
+            self.subtitle_cache.clear()
+            self.parent.subtitle_status_cache.clear()
+
         # Implementation note: This triggers a re-render of the browser
         # by reloading the current library content
         if self.all_movies:
