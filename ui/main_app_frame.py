@@ -514,9 +514,9 @@ class MainAppFrame(ctk.CTkFrame):
                     if lib_names:
                         self.safe_after(0, lambda: self.library_combo.set("Select a library..."))
                         # Don't auto-load library - let user choose
-                        self.safe_after(0, lambda: self.log(f"✓ Loaded {len(self.libraries)} libraries - Select one to begin\n"))
+                        self.safe_after(0, lambda: self.log(f"[OK] Loaded {len(self.libraries)} libraries - Select one to begin\n"))
                     else:
-                        self.safe_after(0, lambda: self.log("⚠ No libraries found\n", level="warning"))
+                        self.safe_after(0, lambda: self.log("[!] No libraries found\n", level="warning"))
 
             except (PlexConnectionError, PlexAuthenticationError) as e:
                 error_msg = str(e)

@@ -707,7 +707,7 @@ class LibraryBrowser:
         self.parent.update_selection_label()
 
     def update_selection_label(self):
-        """Update the selection count label."""
+        """Update the selection count label and enable/disable action buttons."""
         count = len(self.parent.selected_items)
         if count == 0:
             self.parent.selection_label.configure(text="No items selected")
@@ -715,6 +715,9 @@ class LibraryBrowser:
             self.parent.selection_label.configure(text="1 item selected")
         else:
             self.parent.selection_label.configure(text=f"{count} items selected")
+
+        # Enable/disable action buttons based on selection
+        self.parent.enable_action_buttons()
 
     def show_subtitle_status(self, item):
         """Show current subtitle status for a video item."""

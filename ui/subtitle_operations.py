@@ -85,21 +85,32 @@ class SubtitleOperations:
                 try:
                     # Create subliminal video object
                     if isinstance(item, Episode):
+                        # Create fake filename for episode matching
+                        fake_name = f"{item.grandparentTitle}.S{item.seasonNumber:02d}E{item.index:02d}.mkv"
                         video = SubliminalEpisode(
-                            name=item.grandparentTitle,
+                            name=fake_name,
+                            series=item.grandparentTitle,
                             season=item.seasonNumber,
-                            episode=item.index,
-                            title=item.title
+                            episodes=item.index  # Note: parameter is 'episodes' (plural)
                         )
+                        # Set additional attributes
+                        video.title = item.title
+                        if hasattr(item, 'year') and item.year:
+                            video.year = item.year
                     else:  # Movie
+                        # Create fake filename for movie matching
+                        year = getattr(item, 'year', '')
+                        fake_name = f"{item.title}.{year}.mkv" if year else f"{item.title}.mkv"
                         video = SubliminalMovie(
-                            name=item.title,
-                            year=item.year if hasattr(item, 'year') else None
+                            name=fake_name,
+                            title=item.title,
+                            year=getattr(item, 'year', None)
                         )
 
-                    # Search for subtitles
-                    lang = Language(language_code)
-                    subtitles = download_subtitles(
+                    # Search for subtitles (list only, don't download yet)
+                    lang = Language.fromalpha2(language_code)  # Convert 2-letter code (en) to Language object
+                    from subliminal import list_subtitles
+                    subtitles = list_subtitles(
                         {video},
                         languages={lang},
                         providers=self.parent.default_providers.split(',')
@@ -368,12 +379,23 @@ class SubtitleOperations:
                     self.parent.safe_after(0, lambda t=title, err=str(e):
                         self.parent.log(f"Error downloading subtitle for {t}: {err}", "error"))
 
+            # Reload items to get fresh subtitle data from Plex
+            if successful_items:
+                self.parent.safe_after(0, lambda: self.parent.update_status(
+                    f"Downloaded {success_count}/{len(items_to_download)} - Refreshing indicators..."
+                ))
+                for item in successful_items:
+                    try:
+                        item.reload()
+                    except Exception as e:
+                        logging.debug(f"Error reloading item: {e}")
+
             # Update UI after completion
-            self.parent.safe_after(0, lambda: self._finalize_download(success_count, len(items_to_download)))
+            self.parent.safe_after(0, lambda: self._finalize_download(success_count, len(items_to_download), successful_items))
 
         threading.Thread(target=task, daemon=True).start()
 
-    def _finalize_download(self, success_count, total_count):
+    def _finalize_download(self, success_count, total_count, successful_items=None):
         """Finalize download and update UI."""
         self.parent.hide_progress()
         self.parent.enable_action_buttons()
@@ -387,8 +409,11 @@ class SubtitleOperations:
             self.subtitle_selections.clear()
             self.parent.clear_info_panel()
 
-            # Refresh subtitle indicators
-            self.parent.refresh_subtitle_indicators()
+            # Refresh subtitle indicators for successful items
+            if successful_items:
+                self.parent.refresh_subtitle_indicators(successful_items)
+            else:
+                self.parent.refresh_subtitle_indicators()
         else:
             self.parent.update_status("No subtitles downloaded")
             self.parent.log("Download failed for all items", "error")
@@ -448,20 +473,31 @@ class SubtitleOperations:
 
                     # Check if subtitles are available
                     if isinstance(item, Episode):
+                        # Create fake filename for episode matching
+                        fake_name = f"{item.grandparentTitle}.S{item.seasonNumber:02d}E{item.index:02d}.mkv"
                         video = SubliminalEpisode(
-                            name=item.grandparentTitle,
+                            name=fake_name,
+                            series=item.grandparentTitle,
                             season=item.seasonNumber,
-                            episode=item.index,
-                            title=item.title
+                            episodes=item.index  # Note: parameter is 'episodes' (plural)
                         )
+                        # Set additional attributes
+                        video.title = item.title
+                        if hasattr(item, 'year') and item.year:
+                            video.year = item.year
                     else:
+                        # Create fake filename for movie matching
+                        year = getattr(item, 'year', '')
+                        fake_name = f"{item.title}.{year}.mkv" if year else f"{item.title}.mkv"
                         video = SubliminalMovie(
-                            name=item.title,
-                            year=item.year if hasattr(item, 'year') else None
+                            name=fake_name,
+                            title=item.title,
+                            year=getattr(item, 'year', None)
                         )
 
-                    lang = Language(language_code)
-                    subtitles = download_subtitles(
+                    lang = Language.fromalpha2(language_code)  # Convert 2-letter code (en) to Language object
+                    from subliminal import list_subtitles
+                    subtitles = list_subtitles(
                         {video},
                         languages={lang},
                         providers=self.parent.default_providers.split(',')
@@ -702,6 +738,7 @@ class SubtitleOperations:
             self.parent.log(f"Deleting subtitles from {len(items)} items")
 
             success_count = 0
+            successful_items = []
 
             for item in items:
                 title = self.parent._get_item_title(item)
@@ -716,6 +753,7 @@ class SubtitleOperations:
 
                     if deleted_count > 0:
                         success_count += 1
+                        successful_items.append(item)
                         self.parent.safe_after(0, lambda t=title, c=deleted_count:
                             self.parent.log(f"Deleted {c} subtitle stream(s) from: {t}"))
                     else:
@@ -726,12 +764,23 @@ class SubtitleOperations:
                     self.parent.safe_after(0, lambda t=title, err=str(e):
                         self.parent.log(f"Error deleting subtitles from {t}: {err}", "error"))
 
+            # Reload items to get fresh subtitle data from Plex
+            if successful_items:
+                self.parent.safe_after(0, lambda: self.parent.update_status(
+                    f"Deleted subtitles from {success_count}/{len(items)} - Refreshing indicators..."
+                ))
+                for item in successful_items:
+                    try:
+                        item.reload()
+                    except Exception as e:
+                        logging.debug(f"Error reloading item: {e}")
+
             # Update UI
-            self.parent.safe_after(0, lambda: self._finalize_delete(success_count, len(items)))
+            self.parent.safe_after(0, lambda: self._finalize_delete(success_count, len(items), successful_items))
 
         threading.Thread(target=task, daemon=True).start()
 
-    def _finalize_delete(self, success_count, total_count):
+    def _finalize_delete(self, success_count, total_count, successful_items=None):
         """Finalize delete and update UI."""
         self.parent.hide_progress()
         self.parent.enable_action_buttons()
@@ -739,8 +788,11 @@ class SubtitleOperations:
         if success_count > 0:
             self.parent.update_status(f"Deleted subtitles from {success_count}/{total_count} items")
             self.parent.log(f"Delete complete: {success_count}/{total_count} succeeded")
-            # Refresh subtitle indicators
-            self.parent.refresh_subtitle_indicators()
+            # Refresh subtitle indicators for successful items
+            if successful_items:
+                self.parent.refresh_subtitle_indicators(successful_items)
+            else:
+                self.parent.refresh_subtitle_indicators()
         else:
             self.parent.update_status("No subtitles deleted")
             self.parent.log("No subtitles were deleted", "warning")
