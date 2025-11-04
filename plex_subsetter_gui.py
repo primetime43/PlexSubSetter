@@ -26,6 +26,14 @@ from subliminal.video import Episode as SubliminalEpisode, Movie as SubliminalMo
 from subliminal.providers.opensubtitles import OpenSubtitlesProvider
 from babelfish import Language
 
+# Import security utilities
+from utils.security import (
+    sanitize_subtitle_filename,
+    create_secure_subtitle_path,
+    validate_subtitle_content_size,
+    sanitize_filename
+)
+
 # Import error handling framework
 from error_handling import (
     PlexConnectionError, PlexAuthenticationError, LibraryNotFoundError,
@@ -2145,15 +2153,16 @@ class MainAppFrame(ctk.CTkFrame):
                     import tempfile
                     temp_dir = tempfile.gettempdir()
 
-                    # Create filename based on item type
-                    if isinstance(item, Episode):
-                        subtitle_filename = f"{item.grandparentTitle}.S{item.seasonNumber:02d}E{item.index:02d}.{language_code}.srt"
-                    else:
-                        subtitle_filename = f"{item.title}.{language_code}.srt"
-
-                    # Remove invalid filename characters
-                    subtitle_filename = "".join(c for c in subtitle_filename if c.isalnum() or c in (' ', '.', '_', '-'))
+                    # Create secure subtitle filename
+                    subtitle_filename = sanitize_subtitle_filename(item, language_code)
                     subtitle_path = os.path.join(temp_dir, subtitle_filename)
+
+                    # Validate subtitle content size (prevent disk exhaustion)
+                    try:
+                        validate_subtitle_content_size(selected_sub.content)
+                    except ValueError as e:
+                        self.log(f"Error: {e}")
+                        continue
 
                     # Write subtitle content to file
                     with open(subtitle_path, 'wb') as f:
@@ -2166,16 +2175,21 @@ class MainAppFrame(ctk.CTkFrame):
                             # Get video file path from Plex
                             if hasattr(item, 'media') and item.media:
                                 video_path = item.media[0].parts[0].file
-                                video_dir = os.path.dirname(video_path)
-                                video_base = os.path.splitext(os.path.basename(video_path))[0]
 
-                                # Create subtitle filename: VideoName.{lang}.srt
-                                final_subtitle_filename = f"{video_base}.{language_code}.srt"
-                                final_subtitle_path = os.path.join(video_dir, final_subtitle_filename)
+                                # Create secure subtitle path (prevents path traversal)
+                                try:
+                                    final_subtitle_path = create_secure_subtitle_path(
+                                        video_path, language_code, item
+                                    )
+                                except ValueError as path_error:
+                                    self.log(f"Security error: {path_error}")
+                                    self.log("Falling back to Plex upload method")
+                                    item.uploadSubtitles(subtitle_path)
+                                    continue
 
                                 # Copy subtitle file to video directory
                                 import shutil
-                                shutil.copy2(subtitle_path, final_subtitle_path)
+                                shutil.copy2(subtitle_path, str(final_subtitle_path))
 
                                 self.log(f"Saved subtitle to: {final_subtitle_path}")
 
@@ -2209,8 +2223,9 @@ class MainAppFrame(ctk.CTkFrame):
                     # Clean up temp file
                     try:
                         os.remove(subtitle_path)
-                    except:
-                        pass
+                    except (OSError, PermissionError) as cleanup_error:
+                        # Log but don't fail - cleanup is non-critical
+                        logging.debug(f"Could not delete temp file {subtitle_path}: {cleanup_error}")
 
                     success_count += 1
                     successful_items.append(item)
