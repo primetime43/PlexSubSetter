@@ -40,6 +40,11 @@ class LibraryBrowser:
         self.subtitle_cache = {}  # Cache subtitle status: {item_key: bool}
         self.thread_pool = ThreadPoolExecutor(max_workers=5)  # Limit concurrent threads
 
+        # Lazy loading and prefetch
+        self.library_items_cache = {}  # Cache all library items: {library_name: items}
+        self.prefetch_cache = {}  # Cache prefetched page data: {page_num: items}
+        self.is_loading_library = False  # Flag to prevent duplicate loads
+
     def clear_search(self):
         """Clear the search filter."""
         self.parent.search_text.set("")
@@ -118,10 +123,14 @@ class LibraryBrowser:
                 )
 
     def load_library_content(self):
-        """Load movies or TV shows from selected library."""
+        """Load movies or TV shows from selected library with caching."""
         library_name = self.parent.library_combo.get()
         if not library_name:
             self.parent.update_status("Please select a library")
+            return
+
+        # Prevent duplicate loads
+        if self.is_loading_library:
             return
 
         # Clear browser
@@ -131,29 +140,56 @@ class LibraryBrowser:
         self.parent.top_level_frames.clear()
         self.show_frames.clear()
         self.season_frames.clear()
+        self.prefetch_cache.clear()  # Clear prefetch cache for new library
         self.parent.update_selection_label()
+
+        # Check cache first
+        if library_name in self.library_items_cache:
+            logging.info(f"Using cached library data for '{library_name}'")
+            items = self.library_items_cache[library_name]
+            library_type = 'movie' if self.all_movies else 'show'
+
+            if library_type == 'movie' or (items and hasattr(items[0], 'type') and items[0].type == 'movie'):
+                self.all_movies = items
+                self.all_shows = None
+                self.populate_movies(items)
+            else:
+                self.all_shows = items
+                self.all_movies = None
+                self.populate_shows(items)
+
+            self.parent.update_status(f"Loaded {len(items)} items from '{library_name}' (cached)")
+            return
 
         def task():
             """Background thread to load library content from Plex."""
+            self.is_loading_library = True
             self.parent.show_browser_loading()
             try:
                 # Get library
                 library = self.parent.plex.library.section(library_name)
                 self.parent.current_library = library
 
+                # Use lazy loading with streaming
+                logging.info(f"Loading library '{library_name}' from Plex...")
+
                 if library.type == 'movie':
+                    # Load all items (Plex API doesn't support pagination, but we cache)
                     items = library.all()
+                    self.library_items_cache[library_name] = items  # Cache for future use
                     self.all_movies = items
                     self.all_shows = None
                     self.parent.safe_after(0, lambda: self.populate_movies(items))
                 elif library.type == 'show':
                     items = library.all()
+                    self.library_items_cache[library_name] = items  # Cache for future use
                     self.all_shows = items
                     self.all_movies = None
                     self.parent.safe_after(0, lambda: self.populate_shows(items))
                 else:
                     self.parent.safe_after(0, lambda: self.parent.update_status(
                         f"Unsupported library type: {library.type}"))
+                    return
 
                 self.parent.safe_after(0, lambda: self.parent.update_status(
                     f"Loaded {len(items)} items from '{library_name}'"))
@@ -161,6 +197,7 @@ class LibraryBrowser:
                 self.parent.log(f"Error loading library: {e}", level="error")
                 self.parent.safe_after(0, lambda: self.parent.update_status(f"Error loading library: {e}"))
             finally:
+                self.is_loading_library = False
                 self.parent.hide_browser_loading()
 
         threading.Thread(target=task, daemon=True).start()
@@ -273,6 +310,10 @@ class LibraryBrowser:
             self.parent.filter_status_label.configure(text="")
 
         self.parent.update_selection_label()
+
+        # Prefetch next page in background
+        if page_num < total_pages:
+            self.prefetch_next_page(page_num + 1, filtered_movies, "movies")
 
     def update_pagination_controls(self, page_num, total_pages, start_idx, end_idx, total_items, item_type):
         """Update pagination controls UI."""
@@ -403,6 +444,10 @@ class LibraryBrowser:
             self.parent.filter_status_label.configure(text="")
 
         self.parent.update_selection_label()
+
+        # Prefetch next page in background
+        if page_num < total_pages:
+            self.prefetch_next_page(page_num + 1, filtered_shows, "shows")
 
     def toggle_show(self, show, frame, expand_var):
         """Toggle show expansion to show/hide seasons."""
@@ -745,6 +790,41 @@ class LibraryBrowser:
             # Failed to check subtitle streams - item may be inaccessible or API error
             logging.debug(f"Error checking subtitle status for item: {e}")
             return False
+
+    def prefetch_next_page(self, next_page_num, filtered_items, item_type):
+        """
+        Prefetch subtitle status for items on the next page in background.
+
+        Args:
+            next_page_num: Page number to prefetch
+            filtered_items: Filtered list of items
+            item_type: "movies" or "shows"
+        """
+        def prefetch_task():
+            """Background task to prefetch subtitle status."""
+            try:
+                # Calculate range for next page
+                start_idx = (next_page_num - 1) * self.items_per_page
+                end_idx = min(start_idx + self.items_per_page, len(filtered_items))
+
+                logging.debug(f"Prefetching subtitle status for {item_type} page {next_page_num} ({start_idx}-{end_idx})")
+
+                # Prefetch subtitle status for next page items
+                for i in range(start_idx, end_idx):
+                    if self.parent._is_destroyed:
+                        return
+
+                    item = filtered_items[i]
+                    # Just check status to populate cache - don't need result
+                    self.check_has_subtitles(item)
+
+                logging.debug(f"Prefetch complete for {item_type} page {next_page_num}")
+
+            except Exception as e:
+                logging.debug(f"Error prefetching page {next_page_num}: {e}")
+
+        # Submit to thread pool
+        self.thread_pool.submit(prefetch_task)
 
     def refresh_subtitle_indicators(self, items_to_refresh=None):
         """
