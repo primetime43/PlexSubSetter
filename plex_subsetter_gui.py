@@ -8,12 +8,18 @@ __version__ = "1.0.0"
 __author__ = "primetime43"
 __repo__ = "https://github.com/primetime43/PlexSubSetter"
 
+import os
+import sys
+
+# Add the project root to the Python path
+project_root = os.path.dirname(os.path.abspath(__file__))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 import customtkinter as ctk
 from tkinter import messagebox
 import threading
 import configparser
-import os
-import sys
 import tempfile
 import webbrowser
 import logging
