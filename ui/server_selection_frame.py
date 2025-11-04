@@ -15,7 +15,7 @@ from error_handling import (
 )
 from utils.constants import (
     CRITICAL_RETRY_ATTEMPTS, CRITICAL_RETRY_DELAY,
-    COLOR_STATUS_GREEN, COLOR_STATUS_RED, COLOR_STATUS_YELLOW
+    COLOR_STATUS_GREEN, COLOR_STATUS_RED, COLOR_STATUS_YELLOW, COLOR_GRAY
 )
 
 
@@ -55,9 +55,9 @@ class ServerSelectionFrame(ctk.CTkFrame):
         logout_btn.grid(row=0, column=1, sticky="e")
 
         # Subtitle
-        subtitle = ctk.CTkLabel(self, text="Select a Plex server to manage subtitles",
+        subtitle = ctk.CTkLabel(self, text="Select a server connection to manage subtitles",
                                font=ctk.CTkFont(size=14))
-        subtitle.grid(row=1, column=0, pady=(0, 20), padx=20)
+        subtitle.grid(row=1, column=0, pady=(0, 10), padx=20)
 
         # Servers container
         servers_frame = ctk.CTkScrollableFrame(self, label_text="Available Servers")
@@ -66,7 +66,7 @@ class ServerSelectionFrame(ctk.CTkFrame):
         self.grid_rowconfigure(2, weight=1)
 
         # Status label
-        self.status_label = ctk.CTkLabel(self, text="Loading servers...", text_color="yellow")
+        self.status_label = ctk.CTkLabel(self, text="Loading servers...", text_color=COLOR_STATUS_YELLOW)
         self.status_label.grid(row=3, column=0, pady=10)
 
         # Load servers
@@ -123,14 +123,37 @@ class ServerSelectionFrame(ctk.CTkFrame):
                         # Platform info
                         platform_text = f"Platform: {res.platform} | Version: {res.platformVersion}"
                         platform_label = ctk.CTkLabel(card, text=platform_text, anchor="w",
-                                                     text_color="gray", font=ctk.CTkFont(size=11))
-                        platform_label.grid(row=2, column=0, sticky="w", padx=15, pady=(0, 15))
+                                                     text_color=COLOR_GRAY, font=ctk.CTkFont(size=11))
+                        platform_label.grid(row=2, column=0, sticky="w", padx=15, pady=(0, 10))
 
-                        # Connect button
-                        connect_btn = ctk.CTkButton(card, text="Connect",
-                                                   command=lambda: self.connect_to_server(res),
-                                                   width=120)
-                        connect_btn.grid(row=0, column=1, rowspan=3, padx=15, pady=10)
+                        # Connections label
+                        conn_header = ctk.CTkLabel(card, text="Available Connections:",
+                                                  font=ctk.CTkFont(size=12, weight="bold"),
+                                                  anchor="w")
+                        conn_header.grid(row=3, column=0, sticky="w", padx=15, pady=(5, 5))
+
+                        # Show all connections
+                        connections = res.connections
+                        for conn_idx, conn in enumerate(connections):
+                            conn_type = "🏠 Local" if conn.local else "🌐 Remote"
+                            conn_text = f"{conn_type}  |  {conn.uri}"
+
+                            conn_btn = ctk.CTkButton(
+                                card,
+                                text=conn_text,
+                                command=lambda c=conn: self.connect_to_server_via_connection(res, c),
+                                width=500,
+                                height=32,
+                                anchor="w",
+                                font=ctk.CTkFont(size=11),
+                                fg_color=("gray85", "gray25"),
+                                hover_color=("gray75", "gray35")
+                            )
+                            conn_btn.grid(row=4+conn_idx, column=0, sticky="ew", padx=15, pady=2)
+
+                        # Add bottom padding
+                        bottom_spacer = ctk.CTkLabel(card, text="", height=10)
+                        bottom_spacer.grid(row=4+len(connections), column=0)
 
                     self.after(0, lambda r=resource, idx=i: create_server_button(r, idx))
 
@@ -140,14 +163,24 @@ class ServerSelectionFrame(ctk.CTkFrame):
 
         threading.Thread(target=load_thread, daemon=True).start()
 
-    def connect_to_server(self, resource):
-        """Connect to selected server with retry logic."""
-        self.status_label.configure(text=f"Connecting to {resource.name}...", text_color=COLOR_STATUS_YELLOW)
+    def connect_to_server_via_connection(self, resource, connection):
+        """
+        Connect to selected server via a specific connection with retry logic.
+
+        Args:
+            resource: Plex server resource object
+            connection: Specific connection object to use
+        """
+        conn_type = "local" if connection.local else "remote"
+        self.status_label.configure(
+            text=f"Connecting to {resource.name} via {conn_type} ({connection.uri})...",
+            text_color=COLOR_STATUS_YELLOW
+        )
 
         def on_retry_callback(func, attempt, error):
             """Update UI during retry attempts."""
             self.after(0, lambda: self.status_label.configure(
-                text=f"Connecting to {resource.name}... (attempt {attempt}/{CRITICAL_RETRY_ATTEMPTS})",
+                text=f"Connecting to {resource.name} via {connection.uri}... (attempt {attempt}/{CRITICAL_RETRY_ATTEMPTS})",
                 text_color=COLOR_STATUS_YELLOW))
 
         @retry_with_backoff(
@@ -159,8 +192,18 @@ class ServerSelectionFrame(ctk.CTkFrame):
         def connect_with_retry():
             """Connect to Plex server with automatic retry."""
             try:
-                plex = resource.connect()
-                return plex
+                # Temporarily replace resource.connections with only the selected one
+                original_connections = resource.connections
+                resource.connections = [connection]
+
+                try:
+                    # Use shorter timeout for direct connection
+                    plex = resource.connect(timeout=10)
+                    return plex
+                finally:
+                    # Restore original connections
+                    resource.connections = original_connections
+
             except ConnectionError as e:
                 raise PlexConnectionError(resource.name, e)
             except Exception as e:
@@ -174,7 +217,7 @@ class ServerSelectionFrame(ctk.CTkFrame):
             try:
                 with ErrorContext("server connection", get_crash_reporter()):
                     plex = connect_with_retry()
-                    logging.info(f"Successfully connected to Plex server: {resource.name} ({resource.platform})")
+                    logging.info(f"Successfully connected to Plex server: {resource.name} ({resource.platform}) via {connection.uri}")
                     self.after(0, lambda: self.on_server_selected(plex))
             except (PlexConnectionError, PlexAuthenticationError) as e:
                 error_msg = ErrorMessageFormatter.format_plex_error(e.original_error or e, f"server {resource.name}")

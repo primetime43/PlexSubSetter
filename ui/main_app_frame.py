@@ -76,11 +76,11 @@ class MainAppFrame(ctk.CTkFrame):
 
             # Use memory backend on Windows to avoid DBM issues
             if sys.platform.startswith('win'):
-                region.configure('dogpile.cache.memory')
+                region.configure('dogpile.cache.memory', replace_existing_backend=True)
             else:
                 cache_file = os.path.join(cache_dir, 'cachefile.dbm')
-                region.configure('dogpile.cache.dbm', arguments={'filename': cache_file})
-        except (RuntimeError, ValueError) as e:
+                region.configure('dogpile.cache.dbm', arguments={'filename': cache_file}, replace_existing_backend=True)
+        except (RuntimeError, ValueError, Exception) as e:
             # Cache already configured or configuration error
             logging.debug(f"Subliminal cache configuration skipped: {e}")
 
