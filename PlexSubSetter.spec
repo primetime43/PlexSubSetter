@@ -4,16 +4,32 @@ PyInstaller spec file for PlexSubSetter
 This file provides fine-grained control over the build process
 """
 
+import os
+import sys
+from PyInstaller.utils.hooks import collect_all, collect_data_files
+
 block_cipher = None
+
+# Collect all files from packages that need special handling
+customtkinter_datas, customtkinter_binaries, customtkinter_hiddenimports = collect_all('customtkinter')
+babelfish_datas, babelfish_binaries, babelfish_hiddenimports = collect_all('babelfish')
+subliminal_datas, subliminal_binaries, subliminal_hiddenimports = collect_all('subliminal')
+plexapi_datas, plexapi_binaries, plexapi_hiddenimports = collect_all('plexapi')
+
+# Combine all collected data
+all_datas = customtkinter_datas + babelfish_datas + subliminal_datas + plexapi_datas
+all_binaries = customtkinter_binaries + babelfish_binaries + subliminal_binaries + plexapi_binaries
+all_hiddenimports = (customtkinter_hiddenimports + babelfish_hiddenimports +
+                     subliminal_hiddenimports + plexapi_hiddenimports)
 
 a = Analysis(
     ['app.py'],
     pathex=[],
-    binaries=[],
+    binaries=all_binaries,
     datas=[
         ('ui', 'ui'),
         ('utils', 'utils'),
-    ],
+    ] + all_datas,
     hiddenimports=[
         'ui.login_frame',
         'ui.server_selection_frame',
@@ -21,11 +37,7 @@ a = Analysis(
         'utils.constants',
         'utils.logging_config',
         'error_handling',
-        'customtkinter',
-        'plexapi',
-        'subliminal',
-        'babelfish',
-    ],
+    ] + all_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

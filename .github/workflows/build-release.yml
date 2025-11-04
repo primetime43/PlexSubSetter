@@ -28,7 +28,7 @@ jobs:
 
     - name: Build Windows executable
       run: |
-        pyinstaller PlexSubSetter.spec --clean
+        python -m PyInstaller PlexSubSetter.spec --clean
       shell: cmd
 
     - name: Rename Windows executable with version
@@ -71,7 +71,7 @@ jobs:
 
     - name: Build macOS executable
       run: |
-        pyinstaller PlexSubSetter.spec --clean
+        python -m PyInstaller PlexSubSetter.spec --clean
 
     - name: Package macOS executable
       run: |
@@ -122,7 +122,7 @@ jobs:
 
     - name: Build Linux executable
       run: |
-        pyinstaller PlexSubSetter.spec --clean
+        python -m PyInstaller PlexSubSetter.spec --clean
 
     - name: Make executable
       run: chmod +x dist/PlexSubSetter
