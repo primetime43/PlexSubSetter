@@ -40,3 +40,22 @@ SUBTITLE_PROVIDERS = {
 # UI Configuration
 ITEMS_PER_PAGE = 50  # Pagination size for large libraries
 MAX_TITLE_LENGTH = 60  # Maximum title length before truncation
+
+# Subtitle Search Configuration
+MAX_SUBTITLE_RESULTS = 10  # Maximum number of subtitle options to display per item
+DEFAULT_SEARCH_TIMEOUT = 30  # Default subtitle search timeout in seconds
+MIN_SEARCH_TIMEOUT = 10  # Minimum search timeout in seconds
+MAX_SEARCH_TIMEOUT = 120  # Maximum search timeout in seconds
+
+# Batch Operation Configuration
+DEFAULT_BATCH_THRESHOLD = 10  # Default threshold for batch operation confirmation
+DEFAULT_CONCURRENT_DOWNLOADS = 3  # Default number of concurrent subtitle downloads
+
+# Retry Configuration
+DEFAULT_RETRY_ATTEMPTS = 2  # Default retry attempts for library operations
+CRITICAL_RETRY_ATTEMPTS = 3  # Retry attempts for critical operations (server connection)
+DEFAULT_RETRY_DELAY = 2.0  # Initial delay between retries in seconds
+CRITICAL_RETRY_DELAY = 1.0  # Initial delay for critical operations
+
+# Authentication Configuration
+OAUTH_LOGIN_TIMEOUT = 300  # OAuth login timeout in seconds (5 minutes)

@@ -6,7 +6,7 @@ import customtkinter as ctk
 import threading
 import webbrowser
 from plexapi.myplex import MyPlexAccount, MyPlexPinLogin
-from utils.constants import __version__, __author__, __repo__
+from utils.constants import __version__, __author__, __repo__, OAUTH_LOGIN_TIMEOUT
 
 
 class LoginFrame(ctk.CTkFrame):
@@ -113,7 +113,7 @@ class LoginFrame(ctk.CTkFrame):
                         self.after(0, lambda: self.handle_error("Login failed or timed out"))
 
                 # Run with timeout of 5 minutes
-                self.pin_login.run(callback=on_login, timeout=300)
+                self.pin_login.run(callback=on_login, timeout=OAUTH_LOGIN_TIMEOUT)
 
             except Exception as e:
                 self.after(0, lambda: self.handle_error(str(e)))

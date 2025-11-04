@@ -13,6 +13,7 @@ from error_handling import (
     ErrorMessageFormatter,
     get_crash_reporter
 )
+from utils.constants import CRITICAL_RETRY_ATTEMPTS, CRITICAL_RETRY_DELAY
 
 
 class ServerSelectionFrame(ctk.CTkFrame):
@@ -126,12 +127,12 @@ class ServerSelectionFrame(ctk.CTkFrame):
         def on_retry_callback(func, attempt, error):
             """Update UI during retry attempts."""
             self.after(0, lambda: self.status_label.configure(
-                text=f"Connecting to {resource.name}... (attempt {attempt}/3)",
+                text=f"Connecting to {resource.name}... (attempt {attempt}/{CRITICAL_RETRY_ATTEMPTS})",
                 text_color="yellow"))
 
         @retry_with_backoff(
-            max_attempts=3,
-            initial_delay=1.0,
+            max_attempts=CRITICAL_RETRY_ATTEMPTS,
+            initial_delay=CRITICAL_RETRY_DELAY,
             exceptions=(Exception,),
             on_retry=on_retry_callback
         )

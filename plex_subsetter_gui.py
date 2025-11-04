@@ -42,6 +42,18 @@ from error_handling import (
     safe_execute, ErrorContext, get_crash_reporter
 )
 
+# Import constants
+from utils.constants import (
+    MAX_SUBTITLE_RESULTS,
+    DEFAULT_RETRY_ATTEMPTS,
+    DEFAULT_RETRY_DELAY,
+    CRITICAL_RETRY_ATTEMPTS,
+    CRITICAL_RETRY_DELAY,
+    MIN_SEARCH_TIMEOUT,
+    MAX_SEARCH_TIMEOUT,
+    OAUTH_LOGIN_TIMEOUT
+)
+
 
 # Set appearance and theme
 ctk.set_appearance_mode("dark")
@@ -213,7 +225,7 @@ class LoginFrame(ctk.CTkFrame):
                         self.after(0, lambda: self.handle_error("Login failed or timed out"))
 
                 # Run with timeout of 5 minutes
-                self.pin_login.run(callback=on_login, timeout=300)
+                self.pin_login.run(callback=on_login, timeout=OAUTH_LOGIN_TIMEOUT)
 
             except Exception as e:
                 self.after(0, lambda: self.handle_error(str(e)))
@@ -342,12 +354,12 @@ class ServerSelectionFrame(ctk.CTkFrame):
         def on_retry_callback(func, attempt, error):
             """Update UI during retry attempts."""
             self.after(0, lambda: self.status_label.configure(
-                text=f"Connecting to {resource.name}... (attempt {attempt}/3)",
+                text=f"Connecting to {resource.name}... (attempt {attempt}/{CRITICAL_RETRY_ATTEMPTS})",
                 text_color="yellow"))
 
         @retry_with_backoff(
-            max_attempts=3,
-            initial_delay=1.0,
+            max_attempts=CRITICAL_RETRY_ATTEMPTS,
+            initial_delay=CRITICAL_RETRY_DELAY,
             exceptions=(Exception,),
             on_retry=on_retry_callback
         )
@@ -811,7 +823,7 @@ class MainAppFrame(ctk.CTkFrame):
         """Refresh library list with error handling."""
         self.log("Fetching libraries...")
 
-        @retry_with_backoff(max_attempts=2, initial_delay=2.0, exceptions=(Exception,))
+        @retry_with_backoff(max_attempts=DEFAULT_RETRY_ATTEMPTS, initial_delay=DEFAULT_RETRY_DELAY, exceptions=(Exception,))
         def fetch_libraries():
             """Fetch libraries with retry."""
             if self._is_destroyed:
@@ -1960,7 +1972,7 @@ class MainAppFrame(ctk.CTkFrame):
             selection_var = ctk.IntVar(value=0)  # Default to first subtitle
             self.subtitle_selections[item] = selection_var
 
-            for i, sub in enumerate(subs_list[:10], 0):  # Show top 10 options
+            for i, sub in enumerate(subs_list[:MAX_SUBTITLE_RESULTS], 0):  # Show top results
                 # Get subtitle info
                 release_info = (
                     getattr(sub, 'movie_release_name', None) or
@@ -2914,7 +2926,7 @@ class MainAppFrame(ctk.CTkFrame):
         ctk.CTkLabel(subtitles_scroll, text="Search Timeout (seconds)",
                     font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", pady=(5, 5))
         settings_vars['search_timeout'] = ctk.IntVar(value=self.search_timeout)
-        timeout_slider = ctk.CTkSlider(subtitles_scroll, from_=10, to=120,
+        timeout_slider = ctk.CTkSlider(subtitles_scroll, from_=MIN_SEARCH_TIMEOUT, to=MAX_SEARCH_TIMEOUT,
                                        variable=settings_vars['search_timeout'],
                                        number_of_steps=22)
         timeout_slider.pack(fill="x", pady=(0, 5))
