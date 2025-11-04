@@ -154,17 +154,23 @@ class MainAppFrame(ctk.CTkFrame):
         # Search/Filter bar (always visible)
         search_frame = ctk.CTkFrame(browser_panel, fg_color="transparent")
         search_frame.grid(row=2, column=0, padx=15, pady=(5, 5), sticky="ew")
-        search_frame.grid_columnconfigure(0, weight=1)
+        search_frame.grid_columnconfigure(1, weight=1)
 
-        self.search_entry = ctk.CTkEntry(search_frame, placeholder_text="🔍 Search/filter items...",
-                                         textvariable=self.search_text, height=32)
-        self.search_entry.grid(row=0, column=0, sticky="ew", padx=(0, 5))
+        # Search label
+        ctk.CTkLabel(search_frame, text="Search:", font=ctk.CTkFont(size=12),
+                    text_color=("gray30", "gray70")).grid(row=0, column=0, padx=(0, 8))
+
+        self.search_entry = ctk.CTkEntry(search_frame, placeholder_text="Type to filter by title...",
+                                         placeholder_text_color=("gray60", "gray70"),
+                                         textvariable=self.search_text, height=32,
+                                         font=ctk.CTkFont(size=13))
+        self.search_entry.grid(row=0, column=1, sticky="ew", padx=(0, 5))
 
         clear_search_btn = ctk.CTkButton(search_frame, text="✕", width=32, height=32,
                                         command=self.clear_search,
                                         fg_color="transparent", hover_color=("gray80", "#404040"),
                                         text_color=("gray10", "gray90"))
-        clear_search_btn.grid(row=0, column=1)
+        clear_search_btn.grid(row=0, column=2)
 
         # Subtitle status filter buttons (for movies only)
         self.filter_btn_frame = ctk.CTkFrame(browser_panel, fg_color="transparent")
@@ -173,27 +179,24 @@ class MainAppFrame(ctk.CTkFrame):
         self.filter_btn_frame.grid_columnconfigure(1, weight=1)
         self.filter_btn_frame.grid_columnconfigure(2, weight=1)
 
-        ctk.CTkLabel(self.filter_btn_frame, text="Show:", font=ctk.CTkFont(size=11, weight="bold"),
-                    text_color="gray").grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 3))
-
         self.filter_all_btn = ctk.CTkButton(self.filter_btn_frame, text="All",
                                            command=lambda: self.set_subtitle_filter("all"),
                                            height=24)
-        self.filter_all_btn.grid(row=1, column=0, padx=(0, 3), sticky="ew")
+        self.filter_all_btn.grid(row=0, column=0, padx=(0, 3), sticky="ew")
 
         self.filter_missing_btn = ctk.CTkButton(self.filter_btn_frame, text="Missing",
                                                command=lambda: self.set_subtitle_filter("missing"),
                                                height=24, fg_color="transparent", border_width=1,
                                                border_color=("gray60", "gray40"),
                                                text_color=("gray10", "gray90"))
-        self.filter_missing_btn.grid(row=1, column=1, padx=(0, 3), sticky="ew")
+        self.filter_missing_btn.grid(row=0, column=1, padx=(0, 3), sticky="ew")
 
         self.filter_has_btn = ctk.CTkButton(self.filter_btn_frame, text="Has Subs",
                                            command=lambda: self.set_subtitle_filter("has"),
                                            height=24, fg_color="transparent", border_width=1,
                                            border_color=("gray60", "gray40"),
                                            text_color=("gray10", "gray90"))
-        self.filter_has_btn.grid(row=1, column=2, sticky="ew")
+        self.filter_has_btn.grid(row=0, column=2, sticky="ew")
 
         # Hide filter buttons by default (will show for movies only)
         self.filter_btn_frame.grid_remove()

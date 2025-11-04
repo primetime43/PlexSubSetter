@@ -323,12 +323,21 @@ class LibraryBrowser:
                 has_subs = self.check_has_subtitles(item)
                 if self.parent._is_destroyed:
                     return
-                if has_subs:
-                    self.parent.safe_after(0, lambda: label.configure(
-                        text="✓", text_color=("green", "#2d7a2d"), font=ctk.CTkFont(size=14, weight="bold")))
-                else:
-                    self.parent.safe_after(0, lambda: label.configure(
-                        text="✗", text_color=("red", "#8b0000"), font=ctk.CTkFont(size=14)))
+
+                # Update label only if it still exists
+                def update_label():
+                    try:
+                        if label.winfo_exists():
+                            if has_subs:
+                                label.configure(text="✓", text_color=("green", "#2d7a2d"),
+                                              font=ctk.CTkFont(size=14, weight="bold"))
+                            else:
+                                label.configure(text="✗", text_color=("red", "#8b0000"),
+                                              font=ctk.CTkFont(size=14))
+                    except Exception:
+                        pass  # Widget was destroyed, ignore
+
+                self.parent.safe_after(0, update_label)
 
             # Submit to thread pool instead of creating new thread
             self.thread_pool.submit(check_status)
