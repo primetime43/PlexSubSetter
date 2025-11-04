@@ -7,29 +7,21 @@ upload, and delete operations.
 """
 
 import customtkinter as ctk
-from tkinter import messagebox, filedialog, TclError
+from tkinter import messagebox, TclError
 import threading
 import os
 import sys
 import tempfile
 import logging
-from plexapi.video import Movie, Episode, Show, Season
+from plexapi.video import Movie, Episode, Show
 from subliminal import region, download_subtitles
-from subliminal.video import Episode as SubliminalEpisode, Movie as SubliminalMovie
 from babelfish import Language
-from utils.security import (
-    sanitize_subtitle_filename,
-    create_secure_subtitle_path,
-    validate_subtitle_content_size,
-    sanitize_filename
-)
 from utils.config_manager import ConfigManager
 from ui.settings_dialog import SettingsDialog
 from ui.subtitle_operations import SubtitleOperations
 from ui.library_browser import LibraryBrowser
 from error_handling import (
     retry_with_backoff,
-    ErrorMessageFormatter,
     get_crash_reporter,
     ErrorContext,
     PlexConnectionError,
@@ -38,11 +30,8 @@ from error_handling import (
 from utils.constants import (
     SEARCH_LANGUAGES,
     SUBTITLE_PROVIDERS,
-    MAX_SUBTITLE_RESULTS,
     DEFAULT_RETRY_ATTEMPTS,
-    DEFAULT_RETRY_DELAY,
-    MIN_SEARCH_TIMEOUT,
-    MAX_SEARCH_TIMEOUT
+    DEFAULT_RETRY_DELAY
 )
 
 

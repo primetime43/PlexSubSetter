@@ -8,7 +8,6 @@ loading, filtering, selection, and subtitle status display functionality.
 import customtkinter as ctk
 import threading
 import logging
-from tkinter import TclError
 from plexapi.video import Movie, Episode, Show, Season
 
 
