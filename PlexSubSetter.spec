@@ -13,7 +13,6 @@ a = Analysis(
     datas=[
         ('ui', 'ui'),
         ('utils', 'utils'),
-        ('config.ini', '.'),
     ],
     hiddenimports=[
         'ui.login_frame',
