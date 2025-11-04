@@ -31,6 +31,10 @@ class LibraryBrowser:
         self.show_frames = {}  # {show: (frame, expand_var, is_expanded)}
         self.season_frames = {}  # {season: (frame, expand_var, is_expanded)}
 
+        # Pagination state
+        self.items_per_page = 30
+        self.current_page = 1
+
     def clear_search(self):
         """Clear the search filter."""
         self.parent.search_text.set("")
@@ -61,9 +65,9 @@ class LibraryBrowser:
         """Filter items based on search text and subtitle status."""
         # If we have movies or shows loaded, reload the page to apply search filter
         if self.all_movies is not None:
-            self.populate_movies(self.all_movies)
+            self.load_movie_page(1)  # Reset to page 1 when filtering
         elif self.all_shows is not None:
-            self.populate_shows(self.all_shows)
+            self.load_show_page(1)  # Reset to page 1 when filtering
 
     def apply_subtitle_status_filter(self):
         """Apply subtitle status filter to items."""
@@ -163,43 +167,59 @@ class LibraryBrowser:
         return title
 
     def populate_movies(self, movies):
-        """Populate browser with movie items."""
-        # Clear browser
-        for widget in self.browser_scroll.winfo_children():
-            widget.destroy()
-        self.parent.selected_items.clear()
-        self.parent.top_level_frames.clear()
+        """Setup movies and load first page."""
+        self.all_movies = movies
+        self.all_shows = None
+        self.current_page = 1
+        self.load_movie_page(1)
 
+    def load_movie_page(self, page_num):
+        """Load a specific page of filtered movies."""
         # Apply search filter
         search_term = self.parent.search_text.get().lower()
         if search_term:
-            filtered_movies = [m for m in movies if search_term in m.title.lower()]
+            filtered_movies = [m for m in self.all_movies if search_term in m.title.lower()]
         else:
-            filtered_movies = movies
+            filtered_movies = self.all_movies
+
+        # Calculate pagination
+        total_movies = len(filtered_movies)
+        total_pages = max(1, (total_movies + self.items_per_page - 1) // self.items_per_page)
+
+        if page_num < 1 or page_num > total_pages:
+            return
+
+        # Clear browser
+        for widget in self.browser_scroll.winfo_children():
+            widget.destroy()
+        self.parent.top_level_frames.clear()
+
+        self.current_page = page_num
+
+        # Calculate range
+        start_idx = (page_num - 1) * self.items_per_page
+        end_idx = min(start_idx + self.items_per_page, total_movies)
 
         if not filtered_movies:
             ctk.CTkLabel(self.browser_scroll, text="No movies found",
                         font=ctk.CTkFont(size=14), text_color="gray").pack(pady=20)
+            self.parent.pagination_frame.grid_remove()
             if search_term:
                 self.parent.filter_status_label.configure(
-                    text=f"No matches for '{search_term}' (0/{len(movies)} movies)"
+                    text=f"No matches for '{search_term}' (0/{len(self.all_movies)} movies)"
                 )
             return
 
-        # Update filter status
-        if search_term:
-            self.parent.filter_status_label.configure(
-                text=f"Showing {len(filtered_movies)}/{len(movies)} movies matching '{search_term}'"
-            )
+        # Create UI for movies on this page
+        for i in range(start_idx, end_idx):
+            movie = filtered_movies[i]
 
-        # Create UI for each movie
-        for movie in filtered_movies:
             # Movie frame
             movie_frame = ctk.CTkFrame(self.browser_scroll, fg_color=("gray85", "gray25"))
             movie_frame.pack(fill="x", padx=10, pady=3)
             movie_frame.grid_columnconfigure(1, weight=1)
 
-            # Store frame reference for filtering
+            # Store frame reference
             self.parent.top_level_frames.append((movie_frame, movie))
 
             # Selection checkbox
@@ -215,11 +235,11 @@ class LibraryBrowser:
                                       font=ctk.CTkFont(size=12), anchor="w")
             title_label.grid(row=0, column=1, padx=5, pady=8, sticky="ew")
 
-            # Subtitle status indicator (async load)
+            # Subtitle status indicator
             status_label = ctk.CTkLabel(movie_frame, text="", width=20)
             status_label.grid(row=0, column=2, padx=10, pady=8)
 
-            # Start background thread to check subtitle status
+            # Check subtitle status in background
             def check_status(item=movie, label=status_label):
                 if self.parent._is_destroyed:
                     return
@@ -235,59 +255,109 @@ class LibraryBrowser:
 
             threading.Thread(target=check_status, daemon=True).start()
 
-        # Apply subtitle status filter if active
-        if self.parent.subtitle_status_filter != "all":
-            # Need to wait a bit for subtitle checks to complete
-            def apply_filter_delayed():
-                import time
-                time.sleep(1)  # Wait for subtitle checks
-                if not self.parent._is_destroyed:
-                    self.parent.safe_after(0, self.apply_subtitle_status_filter)
-
-            threading.Thread(target=apply_filter_delayed, daemon=True).start()
-
-        self.parent.update_selection_label()
-
-    def populate_shows(self, shows):
-        """Populate browser with TV show items."""
-        # Clear browser
-        for widget in self.browser_scroll.winfo_children():
-            widget.destroy()
-        self.parent.selected_items.clear()
-        self.parent.top_level_frames.clear()
-        self.show_frames.clear()
-        self.season_frames.clear()
-
-        # Apply search filter
-        search_term = self.parent.search_text.get().lower()
-        if search_term:
-            filtered_shows = [s for s in shows if search_term in s.title.lower()]
-        else:
-            filtered_shows = shows
-
-        if not filtered_shows:
-            ctk.CTkLabel(self.browser_scroll, text="No shows found",
-                        font=ctk.CTkFont(size=14), text_color="gray").pack(pady=20)
-            if search_term:
-                self.parent.filter_status_label.configure(
-                    text=f"No matches for '{search_term}' (0/{len(shows)} shows)"
-                )
-            return
+        # Update pagination controls
+        self.update_pagination_controls(page_num, total_pages, start_idx, end_idx, total_movies, "movies")
 
         # Update filter status
         if search_term:
             self.parent.filter_status_label.configure(
-                text=f"Showing {len(filtered_shows)}/{len(shows)} shows matching '{search_term}'"
+                text=f"Page {page_num}/{total_pages} - {len(filtered_movies)}/{len(self.all_movies)} movies matching '{search_term}'"
             )
+        else:
+            self.parent.filter_status_label.configure(text="")
 
-        # Create UI for each show
-        for show in filtered_shows:
+        self.parent.update_selection_label()
+
+    def update_pagination_controls(self, page_num, total_pages, start_idx, end_idx, total_items, item_type):
+        """Update pagination controls UI."""
+        # Clear pagination frame
+        for widget in self.parent.pagination_frame.winfo_children():
+            widget.destroy()
+
+        # Previous button
+        prev_btn = ctk.CTkButton(self.parent.pagination_frame, text="◀ Previous",
+                                width=100, height=32,
+                                command=lambda: (self.load_movie_page(page_num - 1) if item_type == "movies"
+                                               else self.load_show_page(page_num - 1)),
+                                state="normal" if page_num > 1 else "disabled")
+        prev_btn.grid(row=0, column=0, padx=5)
+
+        # Page label
+        page_label = ctk.CTkLabel(self.parent.pagination_frame,
+                                 text=f"Page {page_num} of {total_pages}",
+                                 font=ctk.CTkFont(size=12))
+        page_label.grid(row=0, column=1, padx=5)
+
+        # Next button
+        next_btn = ctk.CTkButton(self.parent.pagination_frame, text="Next ▶",
+                                width=100, height=32,
+                                command=lambda: (self.load_movie_page(page_num + 1) if item_type == "movies"
+                                               else self.load_show_page(page_num + 1)),
+                                state="normal" if page_num < total_pages else "disabled")
+        next_btn.grid(row=0, column=2, padx=5)
+
+        # Show pagination frame
+        self.parent.pagination_frame.grid()
+
+        # Update status
+        self.parent.update_status(f"Page {page_num}/{total_pages} ({start_idx + 1}-{end_idx} of {total_items} {item_type})")
+
+    def populate_shows(self, shows):
+        """Setup shows and load first page."""
+        self.all_shows = shows
+        self.all_movies = None
+        self.current_page = 1
+        self.load_show_page(1)
+
+    def load_show_page(self, page_num):
+        """Load a specific page of filtered shows."""
+        # Apply search filter
+        search_term = self.parent.search_text.get().lower()
+        if search_term:
+            filtered_shows = [s for s in self.all_shows if search_term in s.title.lower()]
+        else:
+            filtered_shows = self.all_shows
+
+        # Calculate pagination
+        total_shows = len(filtered_shows)
+        total_pages = max(1, (total_shows + self.items_per_page - 1) // self.items_per_page)
+
+        if page_num < 1 or page_num > total_pages:
+            return
+
+        # Clear browser
+        for widget in self.browser_scroll.winfo_children():
+            widget.destroy()
+        self.parent.top_level_frames.clear()
+        self.show_frames.clear()
+        self.season_frames.clear()
+
+        self.current_page = page_num
+
+        # Calculate range
+        start_idx = (page_num - 1) * self.items_per_page
+        end_idx = min(start_idx + self.items_per_page, total_shows)
+
+        if not filtered_shows:
+            ctk.CTkLabel(self.browser_scroll, text="No shows found",
+                        font=ctk.CTkFont(size=14), text_color="gray").pack(pady=20)
+            self.parent.pagination_frame.grid_remove()
+            if search_term:
+                self.parent.filter_status_label.configure(
+                    text=f"No matches for '{search_term}' (0/{len(self.all_shows)} shows)"
+                )
+            return
+
+        # Create UI for shows on this page
+        for i in range(start_idx, end_idx):
+            show = filtered_shows[i]
+
             # Show frame (collapsible)
             show_frame = ctk.CTkFrame(self.browser_scroll, fg_color=("gray85", "gray25"))
             show_frame.pack(fill="x", padx=10, pady=3)
             show_frame.grid_columnconfigure(2, weight=1)
 
-            # Store frame reference for filtering
+            # Store frame reference
             self.parent.top_level_frames.append((show_frame, show))
 
             # Expand/collapse variable
@@ -314,6 +384,17 @@ class LibraryBrowser:
 
             # Store show frame data
             self.show_frames[show] = (show_frame, expand_var, False)
+
+        # Update pagination controls
+        self.update_pagination_controls(page_num, total_pages, start_idx, end_idx, total_shows, "shows")
+
+        # Update filter status
+        if search_term:
+            self.parent.filter_status_label.configure(
+                text=f"Page {page_num}/{total_pages} - {len(filtered_shows)}/{len(self.all_shows)} shows matching '{search_term}'"
+            )
+        else:
+            self.parent.filter_status_label.configure(text="")
 
         self.parent.update_selection_label()
 
