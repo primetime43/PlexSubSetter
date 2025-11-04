@@ -5,6 +5,8 @@ Server selection frame for choosing Plex Media Server.
 import customtkinter as ctk
 import threading
 import logging
+import socket
+import ipaddress
 from error_handling import (
     retry_with_backoff,
     PlexConnectionError,
@@ -21,6 +23,70 @@ from utils.constants import (
 
 class ServerSelectionFrame(ctk.CTkFrame):
     """Server selection frame."""
+
+    @staticmethod
+    def get_local_ip_addresses():
+        """
+        Get all local IP addresses of this machine.
+
+        Returns:
+            list: List of local IP address strings
+        """
+        local_ips = []
+        try:
+            # Get hostname and resolve to IPs
+            hostname = socket.gethostname()
+            local_ips.extend(socket.gethostbyname_ex(hostname)[2])
+
+            # Also try to get IP by connecting to external host (doesn't actually connect)
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.connect(("8.8.8.8", 80))
+                local_ips.append(s.getsockname()[0])
+        except Exception as e:
+            logging.debug(f"Error getting local IP addresses: {e}")
+
+        return list(set(local_ips))  # Remove duplicates
+
+    @staticmethod
+    def is_same_network(local_ips, server_uri):
+        """
+        Check if server connection is on the same network as this machine.
+
+        Args:
+            local_ips: List of local IP addresses
+            server_uri: Server connection URI (e.g., "http://192.168.1.100:32400")
+
+        Returns:
+            bool: True if on same network, False otherwise
+        """
+        try:
+            # Extract IP from URI
+            server_ip = server_uri.split('://')[1].split(':')[0]
+
+            # Skip if it's a plex.direct domain
+            if 'plex.direct' in server_ip:
+                return False
+
+            # Convert to IP addresses for comparison
+            server_addr = ipaddress.ip_address(server_ip)
+
+            for local_ip in local_ips:
+                try:
+                    local_addr = ipaddress.ip_address(local_ip)
+
+                    # Check if same subnet (assuming /24 for common home networks)
+                    # Compare first 3 octets for IPv4
+                    if isinstance(local_addr, ipaddress.IPv4Address) and isinstance(server_addr, ipaddress.IPv4Address):
+                        local_network = ipaddress.ip_network(f"{local_ip}/24", strict=False)
+                        if server_addr in local_network:
+                            return True
+                except ValueError:
+                    continue
+
+        except Exception as e:
+            logging.debug(f"Error checking network match: {e}")
+
+        return False
 
     def __init__(self, master, account, on_server_selected, on_logout):
         """
@@ -132,28 +198,119 @@ class ServerSelectionFrame(ctk.CTkFrame):
                                                   anchor="w")
                         conn_header.grid(row=3, column=0, sticky="w", padx=15, pady=(5, 5))
 
-                        # Show all connections
+                        # Sort and rank connections by quality
                         connections = res.connections
-                        for conn_idx, conn in enumerate(connections):
-                            conn_type = "🏠 Local" if conn.local else "🌐 Remote"
-                            conn_text = f"{conn_type}  |  {conn.uri}"
+
+                        # Get local machine's IP addresses
+                        local_ips = self.get_local_ip_addresses()
+                        logging.debug(f"Local IP addresses: {local_ips}")
+
+                        def rank_connection(conn):
+                            """
+                            Rank connection quality (lower is better).
+                            Priority: Same-network HTTPS > Same-network HTTP > Remote HTTPS > Remote HTTP
+                            """
+                            score = 0
+
+                            # Check if we're actually on the same network
+                            is_truly_local = self.is_same_network(local_ips, conn.uri)
+
+                            # If marked as local but we're not on same network, deprioritize
+                            if conn.local and not is_truly_local:
+                                score += 150  # Worse than remote connections
+                            elif not conn.local and not is_truly_local:
+                                score += 100  # Remote connection
+                            # else: truly local connection (score += 0, highest priority)
+
+                            # HTTPS is more secure
+                            if not conn.uri.startswith('https'):
+                                score += 10
+
+                            return score
+
+                        sorted_connections = sorted(connections, key=rank_connection)
+                        best_connection = sorted_connections[0] if sorted_connections else None
+
+                        # Show all connections with recommendations
+                        for conn_idx, conn in enumerate(sorted_connections):
+                            is_best = conn == best_connection
+                            is_truly_local = self.is_same_network(local_ips, conn.uri)
+
+                            # Determine connection type display
+                            if is_truly_local:
+                                conn_type = "🏠 Local"
+                                conn_desc = "(Same Network)"
+                            elif conn.local:
+                                conn_type = "🏠 Local"
+                                conn_desc = "(Not Accessible)"
+                            else:
+                                conn_type = "🌐 Remote"
+                                conn_desc = ""
+
+                            protocol = "🔒" if conn.uri.startswith('https') else "🔓"
+
+                            # Extract IP:port from URI for compact display
+                            try:
+                                # Parse URI to get host:port
+                                uri_parts = conn.uri.split('://')
+                                if len(uri_parts) > 1:
+                                    host_port = uri_parts[1]
+                                    # For plex.direct URLs, extract the IP portion
+                                    if 'plex.direct' in host_port:
+                                        # Example: 192-168-1-100.xxx.plex.direct:32400 -> 192.168.1.100:32400
+                                        ip_part = host_port.split('.')[0].replace('-', '.')
+                                        port = host_port.split(':')[-1] if ':' in host_port else '32400'
+                                        display_addr = f"{ip_part}:{port}"
+                                    else:
+                                        display_addr = host_port
+                                else:
+                                    display_addr = conn.uri
+                            except Exception:
+                                display_addr = conn.uri
+
+                            # Build connection text with recommendation
+                            if is_best:
+                                conn_text = f"⭐ RECOMMENDED  |  {conn_type} {conn_desc}  |  {protocol} {display_addr}"
+                                fg_color = (COLOR_STATUS_GREEN, "#1e5631")
+                                hover_color = ("#27ae60", "#1a4d28")
+                                font_weight = "bold"
+                            else:
+                                if conn_desc:
+                                    conn_text = f"{conn_type} {conn_desc}  |  {protocol} {display_addr}"
+                                else:
+                                    conn_text = f"{conn_type}  |  {protocol} {display_addr}"
+                                fg_color = ("gray85", "gray25")
+                                hover_color = ("gray75", "gray35")
+                                font_weight = "normal"
+
+                            # Store full URI for the connection callback
+                            def make_connection_handler(connection, full_uri):
+                                """Create connection handler with full URI for status display."""
+                                def handler():
+                                    # Show full URI in status when connecting
+                                    self.status_label.configure(
+                                        text=f"Connecting via {full_uri}...",
+                                        text_color=COLOR_STATUS_YELLOW
+                                    )
+                                    self.connect_to_server_via_connection(res, connection)
+                                return handler
 
                             conn_btn = ctk.CTkButton(
                                 card,
                                 text=conn_text,
-                                command=lambda c=conn: self.connect_to_server_via_connection(res, c),
+                                command=make_connection_handler(conn, conn.uri),
                                 width=500,
                                 height=32,
                                 anchor="w",
-                                font=ctk.CTkFont(size=11),
-                                fg_color=("gray85", "gray25"),
-                                hover_color=("gray75", "gray35")
+                                font=ctk.CTkFont(size=11, weight=font_weight),
+                                fg_color=fg_color,
+                                hover_color=hover_color
                             )
                             conn_btn.grid(row=4+conn_idx, column=0, sticky="ew", padx=15, pady=2)
 
                         # Add bottom padding
                         bottom_spacer = ctk.CTkLabel(card, text="", height=10)
-                        bottom_spacer.grid(row=4+len(connections), column=0)
+                        bottom_spacer.grid(row=4+len(sorted_connections), column=0)
 
                     self.after(0, lambda r=resource, idx=i: create_server_button(r, idx))
 
