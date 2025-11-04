@@ -4,6 +4,9 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -28,15 +31,16 @@ jobs:
         pyinstaller PlexSubSetter.spec --clean
       shell: cmd
 
+    - name: Rename Windows executable with version
+      run: |
+        cd dist
+        ren PlexSubSetter.exe PlexSubSetter-${{ github.event.release.tag_name }}-Windows.exe
+      shell: cmd
+
     - name: Upload Windows executable to release
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v2
       with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./dist/PlexSubSetter.exe
-        asset_name: PlexSubSetter-${{ github.event.release.tag_name }}-Windows.exe
-        asset_content_type: application/octet-stream
+        files: ./dist/PlexSubSetter-${{ github.event.release.tag_name }}-Windows.exe
 
     - name: Upload build artifacts (for debugging)
       uses: actions/upload-artifact@v4
@@ -69,37 +73,20 @@ jobs:
       run: |
         pyinstaller PlexSubSetter.spec --clean
 
-    - name: Create macOS DMG (optional - creates .app bundle)
+    - name: Package macOS executable
       run: |
-        # The executable is already in dist/PlexSubSetter
-        # For macOS, we can optionally create a .app bundle
-        mkdir -p dist/PlexSubSetter.app/Contents/MacOS
-        cp dist/PlexSubSetter dist/PlexSubSetter.app/Contents/MacOS/
-        # Create a simple tar.gz for distribution
-        cd dist && tar -czf PlexSubSetter-macOS.tar.gz PlexSubSetter
-      continue-on-error: true
+        cd dist
+        # Create tarball with version in name
+        tar -czf PlexSubSetter-${{ github.event.release.tag_name }}-macOS.tar.gz PlexSubSetter
+        # Rename the executable
+        mv PlexSubSetter PlexSubSetter-${{ github.event.release.tag_name }}-macOS
 
-    - name: Upload macOS executable to release
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Upload macOS executables to release
+      uses: softprops/action-gh-release@v2
       with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./dist/PlexSubSetter
-        asset_name: PlexSubSetter-${{ github.event.release.tag_name }}-macOS
-        asset_content_type: application/octet-stream
-
-    - name: Upload macOS tarball (if created)
-      uses: actions/upload-release-asset@v1
-      if: success()
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./dist/PlexSubSetter-macOS.tar.gz
-        asset_name: PlexSubSetter-${{ github.event.release.tag_name }}-macOS.tar.gz
-        asset_content_type: application/gzip
-      continue-on-error: true
+        files: |
+          ./dist/PlexSubSetter-${{ github.event.release.tag_name }}-macOS
+          ./dist/PlexSubSetter-${{ github.event.release.tag_name }}-macOS.tar.gz
 
     - name: Upload build artifacts (for debugging)
       uses: actions/upload-artifact@v4
@@ -140,29 +127,20 @@ jobs:
     - name: Make executable
       run: chmod +x dist/PlexSubSetter
 
-    - name: Create Linux tarball
+    - name: Package Linux executable
       run: |
-        cd dist && tar -czf PlexSubSetter-Linux.tar.gz PlexSubSetter
+        cd dist
+        # Create tarball with version in name
+        tar -czf PlexSubSetter-${{ github.event.release.tag_name }}-Linux.tar.gz PlexSubSetter
+        # Rename the executable
+        mv PlexSubSetter PlexSubSetter-${{ github.event.release.tag_name }}-Linux
 
-    - name: Upload Linux executable to release
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Upload Linux executables to release
+      uses: softprops/action-gh-release@v2
       with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./dist/PlexSubSetter
-        asset_name: PlexSubSetter-${{ github.event.release.tag_name }}-Linux
-        asset_content_type: application/octet-stream
-
-    - name: Upload Linux tarball to release
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./dist/PlexSubSetter-Linux.tar.gz
-        asset_name: PlexSubSetter-${{ github.event.release.tag_name }}-Linux.tar.gz
-        asset_content_type: application/gzip
+        files: |
+          ./dist/PlexSubSetter-${{ github.event.release.tag_name }}-Linux
+          ./dist/PlexSubSetter-${{ github.event.release.tag_name }}-Linux.tar.gz
 
     - name: Upload build artifacts (for debugging)
       uses: actions/upload-artifact@v4
