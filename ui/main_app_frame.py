@@ -49,7 +49,8 @@ class MainAppFrame(ctk.CTkFrame):
         self._is_destroyed = False
         self.top_level_frames = []  # Store only top-level show/movie frames for filtering
         self.search_text = ctk.StringVar()
-        self.search_text.trace_add("write", lambda *args: self.filter_items())
+        self.search_debounce_timer = None  # Timer for debouncing search
+        self.search_text.trace_add("write", lambda *args: self.debounced_filter_items())
         self.subtitle_status_cache = {}  # Cache subtitle status: {item_id: has_subs}
         self.subtitle_status_filter = "all"  # Filter: "all", "missing", "has"
         self.all_movies = None  # Store all movies for filtering
@@ -567,6 +568,18 @@ class MainAppFrame(ctk.CTkFrame):
     def set_subtitle_filter(self, filter_type):
         """Set the subtitle status filter (all, missing, has) - delegated to LibraryBrowser."""
         self.library_browser.set_subtitle_filter(filter_type)
+
+    def debounced_filter_items(self):
+        """Debounce search filter to avoid filtering on every keystroke."""
+        # Cancel previous timer
+        if self.search_debounce_timer is not None:
+            try:
+                self.after_cancel(self.search_debounce_timer)
+            except Exception:
+                pass
+
+        # Schedule new filter after 300ms delay
+        self.search_debounce_timer = self.after(300, self.filter_items)
 
     def filter_items(self):
         """Filter items based on search text and subtitle status - delegated to LibraryBrowser."""

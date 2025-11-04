@@ -8,6 +8,7 @@ loading, filtering, selection, and subtitle status display functionality.
 import customtkinter as ctk
 import threading
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from plexapi.video import Movie, Episode, Show, Season
 
 
@@ -34,6 +35,10 @@ class LibraryBrowser:
         # Pagination state
         self.items_per_page = 30
         self.current_page = 1
+
+        # Performance optimizations
+        self.subtitle_cache = {}  # Cache subtitle status: {item_key: bool}
+        self.thread_pool = ThreadPoolExecutor(max_workers=5)  # Limit concurrent threads
 
     def clear_search(self):
         """Clear the search filter."""
@@ -239,7 +244,7 @@ class LibraryBrowser:
             status_label = ctk.CTkLabel(movie_frame, text="", width=20)
             status_label.grid(row=0, column=2, padx=10, pady=8)
 
-            # Check subtitle status in background
+            # Check subtitle status using thread pool
             def check_status(item=movie, label=status_label):
                 if self.parent._is_destroyed:
                     return
@@ -253,7 +258,8 @@ class LibraryBrowser:
                     self.parent.safe_after(0, lambda: label.configure(
                         text="✗", text_color=("red", "#8b0000"), font=ctk.CTkFont(size=14)))
 
-            threading.Thread(target=check_status, daemon=True).start()
+            # Submit to thread pool instead of creating new thread
+            self.thread_pool.submit(check_status)
 
         # Update pagination controls
         self.update_pagination_controls(page_num, total_pages, start_idx, end_idx, total_movies, "movies")
@@ -713,18 +719,26 @@ class LibraryBrowser:
         Returns:
             bool: True if item has subtitles, False otherwise
         """
-        # Check cache first
+        # Check local cache first (faster)
+        if not force_refresh and item.ratingKey in self.subtitle_cache:
+            return self.subtitle_cache[item.ratingKey]
+
+        # Check parent cache (shared across components)
         if not force_refresh and item.ratingKey in self.parent.subtitle_status_cache:
-            return self.parent.subtitle_status_cache[item.ratingKey]
+            result = self.parent.subtitle_status_cache[item.ratingKey]
+            self.subtitle_cache[item.ratingKey] = result  # Copy to local cache
+            return result
 
         # Check Plex API
         try:
             for media in item.media:
                 for part in media.parts:
                     if part.subtitleStreams():
+                        self.subtitle_cache[item.ratingKey] = True
                         self.parent.subtitle_status_cache[item.ratingKey] = True
                         return True
 
+            self.subtitle_cache[item.ratingKey] = False
             self.parent.subtitle_status_cache[item.ratingKey] = False
             return False
         except (AttributeError, RuntimeError, Exception) as e:
