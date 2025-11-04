@@ -7,6 +7,8 @@ loading, filtering, selection, and subtitle status display functionality.
 
 import customtkinter as ctk
 import threading
+import logging
+from tkinter import TclError
 from plexapi.video import Movie, Episode, Show, Season
 
 
@@ -597,8 +599,9 @@ class LibraryBrowser:
                                 forced = " [Forced]" if sub.forced else ""
                                 sdh = " [SDH]" if sub.hearingImpaired else ""
                                 subtitle_details.append(f"  • {lang} ({codec}){forced}{sdh}")
-            except:
-                pass
+            except (AttributeError, RuntimeError, Exception) as e:
+                # Failed to read subtitle streams - item may be inaccessible or API error
+                logging.debug(f"Error reading subtitle details for item: {e}")
 
             if subtitle_details:
                 details_text = "\n".join(subtitle_details)
@@ -636,7 +639,9 @@ class LibraryBrowser:
 
             self.parent.subtitle_status_cache[item.ratingKey] = False
             return False
-        except:
+        except (AttributeError, RuntimeError, Exception) as e:
+            # Failed to check subtitle streams - item may be inaccessible or API error
+            logging.debug(f"Error checking subtitle status for item: {e}")
             return False
 
     def refresh_subtitle_indicators(self, items_to_refresh=None):

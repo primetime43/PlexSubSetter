@@ -7,7 +7,7 @@ upload, and delete operations.
 """
 
 import customtkinter as ctk
-from tkinter import messagebox, filedialog
+from tkinter import messagebox, filedialog, TclError
 import threading
 import configparser
 import os
@@ -88,8 +88,9 @@ class MainAppFrame(ctk.CTkFrame):
             else:
                 cache_file = os.path.join(cache_dir, 'cachefile.dbm')
                 region.configure('dogpile.cache.dbm', arguments={'filename': cache_file})
-        except:
-            pass  # Cache already configured
+        except (RuntimeError, ValueError) as e:
+            # Cache already configured or configuration error
+            logging.debug(f"Subliminal cache configuration skipped: {e}")
 
         # Configure grid - two column layout
         self.grid_columnconfigure(0, weight=0, minsize=380)  # Browser panel
@@ -104,8 +105,9 @@ class MainAppFrame(ctk.CTkFrame):
         self._is_destroyed = True
         try:
             super().destroy()
-        except:
-            pass
+        except (RuntimeError, AttributeError) as e:
+            # Widget already destroyed or doesn't exist
+            logging.debug(f"Error during widget destroy: {e}")
 
     @property
     def search_results(self):
@@ -124,8 +126,9 @@ class MainAppFrame(ctk.CTkFrame):
                 # Check if the widget still exists before scheduling
                 if self.winfo_exists():
                     self.after(ms, func)
-            except:
-                pass
+            except (RuntimeError, AttributeError, TclError) as e:
+                # Widget destroyed or Tcl error during scheduling
+                logging.debug(f"Could not schedule after() call: {e}")
 
     def create_widgets(self):
         """Create main application widgets."""
@@ -602,8 +605,9 @@ class MainAppFrame(ctk.CTkFrame):
                 for child in widget.winfo_children():
                     if search_episodes(child):
                         return True
-            except:
-                pass
+            except (RuntimeError, TclError) as e:
+                # Widget destroyed during iteration
+                logging.debug(f"Error searching widget children: {e}")
 
             return False
 
@@ -622,8 +626,9 @@ class MainAppFrame(ctk.CTkFrame):
                     for child in widget.winfo_children():
                         if has_any_episodes(child):
                             return True
-                except:
-                    pass
+                except (RuntimeError, TclError) as e:
+                    # Widget destroyed during iteration
+                    logging.debug(f"Error checking for episodes: {e}")
                 return False
 
             # If no episodes loaded yet, show the item (we don't know)

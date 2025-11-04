@@ -176,8 +176,9 @@ class SubtitleOperations:
                             break
                     if actual_filename != "Unknown":
                         break
-            except:
-                pass
+            except (AttributeError, RuntimeError, Exception) as e:
+                # Failed to read file path - item may be inaccessible or API error
+                logging.debug(f"Error getting filename for item '{title}': {e}")
 
             # Video header frame
             video_frame = ctk.CTkFrame(self.parent.info_scroll, fg_color=("gray85", "gray25"))

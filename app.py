@@ -6,6 +6,7 @@ Main application entry point with modular architecture.
 
 import customtkinter as ctk
 import logging
+from tkinter import TclError
 
 # Import UI components
 from ui.login_frame import LoginFrame
@@ -58,15 +59,17 @@ class PlexSubSetterApp(ctk.CTk):
         if self.current_frame:
             try:
                 self.current_frame.destroy()
-            except:
-                pass
+            except (RuntimeError, AttributeError, TclError) as e:
+                # Frame already destroyed or Tcl error
+                logging.debug(f"Error destroying frame during close: {e}")
 
         # Destroy the window
         try:
             self.quit()
             self.destroy()
-        except:
-            pass
+        except (RuntimeError, TclError) as e:
+            # Window already destroyed or Tcl error
+            logging.debug(f"Error destroying window: {e}")
 
     def resize_and_center(self, width, height):
         """Resize window and center it on screen."""
@@ -84,8 +87,9 @@ class PlexSubSetterApp(ctk.CTk):
         if self.current_frame:
             try:
                 self.current_frame.destroy()
-            except:
-                pass
+            except (RuntimeError, AttributeError, TclError) as e:
+                # Frame already destroyed or Tcl error
+                logging.debug(f"Error destroying frame in show_login: {e}")
 
         # Resize for login (small window)
         self.minsize(400, 500)
@@ -110,8 +114,9 @@ class PlexSubSetterApp(ctk.CTk):
         if self.current_frame:
             try:
                 self.current_frame.destroy()
-            except:
-                pass
+            except (RuntimeError, AttributeError, TclError) as e:
+                # Frame already destroyed or Tcl error
+                logging.debug(f"Error destroying frame in show_server_selection: {e}")
 
         # Resize for server selection (medium window)
         self.minsize(600, 500)
@@ -137,8 +142,9 @@ class PlexSubSetterApp(ctk.CTk):
         if self.current_frame:
             try:
                 self.current_frame.destroy()
-            except:
-                pass
+            except (RuntimeError, AttributeError, TclError) as e:
+                # Frame already destroyed or Tcl error
+                logging.debug(f"Error destroying frame in show_main_app: {e}")
 
         # Resize for main app (large window)
         self.minsize(1000, 750)
