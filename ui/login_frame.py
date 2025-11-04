@@ -13,6 +13,13 @@ class LoginFrame(ctk.CTkFrame):
     """Login frame for Plex OAuth authentication."""
 
     def __init__(self, master, on_login_success):
+        """
+        Initialize the login frame.
+
+        Args:
+            master: Parent widget
+            on_login_success: Callback function to execute on successful login with account parameter
+        """
         super().__init__(master)
         self.on_login_success = on_login_success
         self.pin_login = None
@@ -84,6 +91,7 @@ class LoginFrame(ctk.CTkFrame):
         self.status_label.configure(text="Opening your browser for authentication...", text_color="yellow")
 
         def oauth_thread():
+            """Background thread to handle OAuth authentication process."""
             try:
                 # Create PIN login with OAuth
                 self.pin_login = MyPlexPinLogin(oauth=True)
@@ -103,6 +111,12 @@ class LoginFrame(ctk.CTkFrame):
 
                 # Wait for login with callback
                 def on_login(token):
+                    """
+                    Callback function executed when OAuth login completes.
+
+                    Args:
+                        token: OAuth token received from Plex, or None if login failed
+                    """
                     if token:
                         try:
                             account = MyPlexAccount(token=token)

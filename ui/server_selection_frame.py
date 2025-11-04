@@ -20,6 +20,15 @@ class ServerSelectionFrame(ctk.CTkFrame):
     """Server selection frame."""
 
     def __init__(self, master, account, on_server_selected, on_logout):
+        """
+        Initialize the server selection frame.
+
+        Args:
+            master: Parent widget
+            account: Authenticated MyPlexAccount instance
+            on_server_selected: Callback function executed when server is selected with plex parameter
+            on_logout: Callback function to execute on logout
+        """
         super().__init__(master)
         self.account = account
         self.on_server_selected = on_server_selected
@@ -63,6 +72,7 @@ class ServerSelectionFrame(ctk.CTkFrame):
     def load_servers(self, container):
         """Load available Plex servers."""
         def load_thread():
+            """Background thread to load servers from Plex account."""
             try:
                 resources = self.account.resources()
                 servers = [r for r in resources if r.product == 'Plex Media Server']
@@ -83,6 +93,13 @@ class ServerSelectionFrame(ctk.CTkFrame):
 
                 for i, resource in enumerate(sorted_servers):
                     def create_server_button(res, row_index):
+                        """
+                        Create a server card button in the UI.
+
+                        Args:
+                            res: Plex server resource object
+                            row_index: Grid row position for the server card
+                        """
                         # Server card
                         card = ctk.CTkFrame(container)
                         card.grid(row=row_index, column=0, pady=5, padx=5, sticky="ew")
@@ -150,6 +167,7 @@ class ServerSelectionFrame(ctk.CTkFrame):
                 raise PlexConnectionError(resource.name, e)
 
         def connect_thread():
+            """Background thread to connect to selected Plex server."""
             try:
                 with ErrorContext("server connection", get_crash_reporter()):
                     plex = connect_with_retry()

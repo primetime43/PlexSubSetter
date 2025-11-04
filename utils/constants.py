@@ -59,3 +59,6 @@ CRITICAL_RETRY_DELAY = 1.0  # Initial delay for critical operations
 
 # Authentication Configuration
 OAUTH_LOGIN_TIMEOUT = 300  # OAuth login timeout in seconds (5 minutes)
+
+# Configuration File
+CONFIG_FILE_PATH = 'config.ini'  # Path to application configuration file

@@ -126,6 +126,7 @@ class LibraryBrowser:
         self.parent.update_selection_label()
 
         def task():
+            """Background thread to load library content from Plex."""
             self.parent.show_browser_loading()
             try:
                 # Get library
@@ -342,6 +343,7 @@ class LibraryBrowser:
 
             # Load seasons in background
             def load_seasons():
+                """Background thread to load seasons for the show."""
                 try:
                     seasons = show.seasons()
                     self.parent.safe_after(0, lambda: self.populate_seasons(show_frame, seasons))
@@ -410,6 +412,7 @@ class LibraryBrowser:
 
             # Load episodes in background
             def load_episodes():
+                """Background thread to load episodes for the season."""
                 try:
                     episodes = season.episodes()
                     self.parent.safe_after(0, lambda: self.populate_episodes(season_frame, episodes))
@@ -478,6 +481,7 @@ class LibraryBrowser:
         if var.get():
             # Select all episodes in show
             def select_all():
+                """Background thread to select all items."""
                 try:
                     for season in show.seasons():
                         for episode in season.episodes():
@@ -493,6 +497,7 @@ class LibraryBrowser:
         else:
             # Deselect all episodes in show
             def deselect_all():
+                """Background thread to deselect all items."""
                 try:
                     for season in show.seasons():
                         for episode in season.episodes():
@@ -511,6 +516,7 @@ class LibraryBrowser:
         if var.get():
             # Select all episodes in season
             def select_all():
+                """Background thread to select all items."""
                 try:
                     for episode in season.episodes():
                         if episode not in self.parent.selected_items:
@@ -525,6 +531,7 @@ class LibraryBrowser:
         else:
             # Deselect all episodes in season
             def deselect_all():
+                """Background thread to deselect all items."""
                 try:
                     for episode in season.episodes():
                         if episode in self.parent.selected_items:
@@ -540,6 +547,7 @@ class LibraryBrowser:
     def select_all_items(self):
         """Select all visible items in the browser."""
         def task():
+            """Background thread to select all visible items."""
             try:
                 if self.all_movies:
                     # Select all movies

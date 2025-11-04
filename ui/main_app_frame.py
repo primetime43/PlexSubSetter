@@ -9,7 +9,6 @@ upload, and delete operations.
 import customtkinter as ctk
 from tkinter import messagebox, filedialog, TclError
 import threading
-import configparser
 import os
 import sys
 import tempfile
@@ -24,6 +23,7 @@ from utils.security import (
     validate_subtitle_content_size,
     sanitize_filename
 )
+from utils.config_manager import ConfigManager
 from ui.settings_dialog import SettingsDialog
 from ui.subtitle_operations import SubtitleOperations
 from ui.library_browser import LibraryBrowser
@@ -65,6 +65,9 @@ class MainAppFrame(ctk.CTkFrame):
         self.subtitle_status_filter = "all"  # Filter: "all", "missing", "has"
         self.all_movies = None  # Store all movies for filtering
         self.all_shows = None  # Store all shows for filtering
+
+        # Initialize configuration manager
+        self.config_manager = ConfigManager()
 
         # Load settings
         self.load_settings()
@@ -784,34 +787,27 @@ class MainAppFrame(ctk.CTkFrame):
         return messagebox.askyesno(title, message, parent=self)
 
     def load_settings(self):
-        """Load application settings."""
-        config = configparser.ConfigParser()
-        config.read('config.ini')
+        """Load application settings using ConfigManager."""
+        settings = self.config_manager.load_settings()
 
-        # === General Settings ===
-        self.subtitle_save_method = config.get('General', 'subtitle_save_method', fallback='plex')
-        self.default_language = config.get('General', 'default_language', fallback='English')
-        self.appearance_mode = config.get('General', 'appearance_mode', fallback='dark')
-        self.remember_last_library = config.getboolean('General', 'remember_last_library', fallback=True)
-        self.last_library = config.get('General', 'last_library', fallback='')
+        # Apply settings to instance variables
+        self.subtitle_save_method = settings['subtitle_save_method']
+        self.default_language = settings['default_language']
+        self.appearance_mode = settings['appearance_mode']
+        self.remember_last_library = settings['remember_last_library']
+        self.last_library = settings['last_library']
+        self.prefer_hearing_impaired = settings['prefer_hearing_impaired']
+        self.prefer_forced = settings['prefer_forced']
+        self.default_providers = settings['default_providers']
+        self.search_timeout = settings['search_timeout']
+        self.show_log_on_startup = settings['show_log_on_startup']
+        self.default_subtitle_filter = settings['default_subtitle_filter']
+        self.confirm_batch_operations = settings['confirm_batch_operations']
+        self.batch_operation_threshold = settings['batch_operation_threshold']
+        self.concurrent_downloads = settings['concurrent_downloads']
+        self.enable_debug_logging = settings['enable_debug_logging']
 
-        # === Subtitle Settings ===
-        self.prefer_hearing_impaired = config.getboolean('Subtitles', 'prefer_hearing_impaired', fallback=False)
-        self.prefer_forced = config.getboolean('Subtitles', 'prefer_forced', fallback=False)
-        self.default_providers = config.get('Subtitles', 'default_providers', fallback='opensubtitles,podnapisi')
-        self.search_timeout = config.getint('Subtitles', 'search_timeout', fallback=30)
-
-        # === UI Settings ===
-        self.show_log_on_startup = config.getboolean('UI', 'show_log_on_startup', fallback=False)
-        self.default_subtitle_filter = config.get('UI', 'default_subtitle_filter', fallback='all')
-        self.confirm_batch_operations = config.getboolean('UI', 'confirm_batch_operations', fallback=True)
-        self.batch_operation_threshold = config.getint('UI', 'batch_operation_threshold', fallback=10)
-
-        # === Advanced Settings ===
-        self.concurrent_downloads = config.getint('Advanced', 'concurrent_downloads', fallback=3)
-        self.enable_debug_logging = config.getboolean('Advanced', 'enable_debug_logging', fallback=False)
-
-        # Apply settings
+        # Apply runtime settings
         ctk.set_appearance_mode(self.appearance_mode)
 
         # Set logging level based on debug setting
@@ -821,46 +817,28 @@ class MainAppFrame(ctk.CTkFrame):
             logging.getLogger().setLevel(logging.INFO)
 
     def save_settings(self):
-        """Save application settings."""
-        config = configparser.ConfigParser()
+        """Save application settings using ConfigManager."""
+        # Gather current settings
+        settings = {
+            'subtitle_save_method': self.subtitle_save_method,
+            'default_language': self.default_language,
+            'appearance_mode': self.appearance_mode,
+            'remember_last_library': self.remember_last_library,
+            'last_library': self.last_library if hasattr(self, 'last_library') else '',
+            'prefer_hearing_impaired': self.prefer_hearing_impaired,
+            'prefer_forced': self.prefer_forced,
+            'default_providers': self.default_providers,
+            'search_timeout': self.search_timeout,
+            'show_log_on_startup': self.show_log_on_startup,
+            'default_subtitle_filter': self.default_subtitle_filter,
+            'confirm_batch_operations': self.confirm_batch_operations,
+            'batch_operation_threshold': self.batch_operation_threshold,
+            'concurrent_downloads': self.concurrent_downloads,
+            'enable_debug_logging': self.enable_debug_logging
+        }
 
-        # Read existing config to preserve other sections
-        config.read('config.ini')
-
-        # === General Settings ===
-        if not config.has_section('General'):
-            config.add_section('General')
-        config.set('General', 'subtitle_save_method', self.subtitle_save_method)
-        config.set('General', 'default_language', self.default_language)
-        config.set('General', 'appearance_mode', self.appearance_mode)
-        config.set('General', 'remember_last_library', str(self.remember_last_library))
-        config.set('General', 'last_library', self.last_library if hasattr(self, 'last_library') else '')
-
-        # === Subtitle Settings ===
-        if not config.has_section('Subtitles'):
-            config.add_section('Subtitles')
-        config.set('Subtitles', 'prefer_hearing_impaired', str(self.prefer_hearing_impaired))
-        config.set('Subtitles', 'prefer_forced', str(self.prefer_forced))
-        config.set('Subtitles', 'default_providers', self.default_providers)
-        config.set('Subtitles', 'search_timeout', str(self.search_timeout))
-
-        # === UI Settings ===
-        if not config.has_section('UI'):
-            config.add_section('UI')
-        config.set('UI', 'show_log_on_startup', str(self.show_log_on_startup))
-        config.set('UI', 'default_subtitle_filter', self.default_subtitle_filter)
-        config.set('UI', 'confirm_batch_operations', str(self.confirm_batch_operations))
-        config.set('UI', 'batch_operation_threshold', str(self.batch_operation_threshold))
-
-        # === Advanced Settings ===
-        if not config.has_section('Advanced'):
-            config.add_section('Advanced')
-        config.set('Advanced', 'concurrent_downloads', str(self.concurrent_downloads))
-        config.set('Advanced', 'enable_debug_logging', str(self.enable_debug_logging))
-
-        # Write to file
-        with open('config.ini', 'w') as f:
-            config.write(f)
+        # Save using ConfigManager
+        self.config_manager.save_settings(settings)
 
         # Apply runtime settings changes
         ctk.set_appearance_mode(self.appearance_mode)
