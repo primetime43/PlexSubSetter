@@ -1,6 +1,6 @@
 # PlexSubSetter
 
-Stop going episode by episode to set subtitles in Plex! PlexSubSetter lets you search, download, and manage subtitles for entire seasons, shows, or your whole movie library at once.
+Stop going episode by episode to set subtitles in Plex! PlexSubSetter lets you search, download, and manage subtitles for entire seasons, shows, or your whole movie library at once. This will allow you to set the subtitles easily.
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
