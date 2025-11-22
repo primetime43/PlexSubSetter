@@ -300,7 +300,7 @@ class LibraryBrowser:
             self.parent.top_level_frames.append((movie_frame, movie))
 
             # Selection checkbox
-            var = ctk.BooleanVar(value=False)
+            var = ctk.BooleanVar(value=movie in self.parent.selected_items)
             checkbox = ctk.CTkCheckBox(movie_frame, text="", variable=var, width=20,
                                       command=lambda m=movie, v=var: self.on_item_selected(m, v))
             checkbox.grid(row=0, column=0, padx=(10, 5), pady=8, sticky="w")
@@ -619,7 +619,7 @@ class LibraryBrowser:
             episode_frame.grid_columnconfigure(1, weight=1)
 
             # Selection checkbox
-            var = ctk.BooleanVar(value=False)
+            var = ctk.BooleanVar(value=episode in self.parent.selected_items)
             checkbox = ctk.CTkCheckBox(episode_frame, text="", variable=var, width=20,
                                       command=lambda e=episode, v=var: self.on_item_selected(e, v))
             checkbox.grid(row=0, column=0, padx=5, pady=2, sticky="w")
