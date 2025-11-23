@@ -667,70 +667,58 @@ class LibraryBrowser:
     def on_show_selected(self, show, var, show_frame):
         """Handle show selection - select/deselect all episodes in show."""
         if var.get():
-            # Select all episodes in show
-            def select_all():
-                """Background thread to select all items."""
-                try:
-                    for season in show.seasons():
-                        for episode in season.episodes():
-                            if episode not in self.parent.selected_items:
-                                self.parent.selected_items.append(episode)
+            # Select all episodes in show (synchronous to ensure immediate availability)
+            try:
+                for season in show.seasons():
+                    episodes = season.episodes()
+                    for episode in episodes:
+                        if episode not in self.parent.selected_items:
+                            self.parent.selected_items.append(episode)
 
-                    # Update UI selection count
-                    self.parent.safe_after(0, self.parent.update_selection_label)
-                except Exception as e:
-                    self.parent.log(f"Error selecting episodes for {show.title}: {e}")
-
-            threading.Thread(target=select_all, daemon=True).start()
+                # Update UI selection count
+                self.parent.update_selection_label()
+            except Exception as e:
+                self.parent.log(f"Error selecting episodes for {show.title}: {e}")
         else:
-            # Deselect all episodes in show
-            def deselect_all():
-                """Background thread to deselect all items."""
-                try:
-                    for season in show.seasons():
-                        for episode in season.episodes():
-                            if episode in self.parent.selected_items:
-                                self.parent.selected_items.remove(episode)
+            # Deselect all episodes in show (synchronous)
+            try:
+                for season in show.seasons():
+                    episodes = season.episodes()
+                    for episode in episodes:
+                        if episode in self.parent.selected_items:
+                            self.parent.selected_items.remove(episode)
 
-                    # Update UI selection count
-                    self.parent.safe_after(0, self.parent.update_selection_label)
-                except Exception as e:
-                    self.parent.log(f"Error deselecting episodes for {show.title}: {e}")
-
-            threading.Thread(target=deselect_all, daemon=True).start()
+                # Update UI selection count
+                self.parent.update_selection_label()
+            except Exception as e:
+                self.parent.log(f"Error deselecting episodes for {show.title}: {e}")
 
     def on_season_selected(self, season, var, season_frame):
         """Handle season selection - select/deselect all episodes in season."""
         if var.get():
-            # Select all episodes in season
-            def select_all():
-                """Background thread to select all items."""
-                try:
-                    for episode in season.episodes():
-                        if episode not in self.parent.selected_items:
-                            self.parent.selected_items.append(episode)
+            # Select all episodes in season (synchronous to ensure immediate availability)
+            try:
+                episodes = season.episodes()
+                for episode in episodes:
+                    if episode not in self.parent.selected_items:
+                        self.parent.selected_items.append(episode)
 
-                    # Update UI selection count
-                    self.parent.safe_after(0, self.parent.update_selection_label)
-                except Exception as e:
-                    self.parent.log(f"Error selecting episodes for {season.title}: {e}")
-
-            threading.Thread(target=select_all, daemon=True).start()
+                # Update UI selection count
+                self.parent.update_selection_label()
+            except Exception as e:
+                self.parent.log(f"Error selecting episodes for {season.title}: {e}")
         else:
-            # Deselect all episodes in season
-            def deselect_all():
-                """Background thread to deselect all items."""
-                try:
-                    for episode in season.episodes():
-                        if episode in self.parent.selected_items:
-                            self.parent.selected_items.remove(episode)
+            # Deselect all episodes in season (synchronous)
+            try:
+                episodes = season.episodes()
+                for episode in episodes:
+                    if episode in self.parent.selected_items:
+                        self.parent.selected_items.remove(episode)
 
-                    # Update UI selection count
-                    self.parent.safe_after(0, self.parent.update_selection_label)
-                except Exception as e:
-                    self.parent.log(f"Error deselecting episodes for {season.title}: {e}")
-
-            threading.Thread(target=deselect_all, daemon=True).start()
+                # Update UI selection count
+                self.parent.update_selection_label()
+            except Exception as e:
+                self.parent.log(f"Error deselecting episodes for {season.title}: {e}")
 
     def select_all_items(self):
         """Select all visible items in the browser."""
