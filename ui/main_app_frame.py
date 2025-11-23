@@ -123,6 +123,21 @@ class MainAppFrame(ctk.CTkFrame):
                 # Widget destroyed or Tcl error during scheduling
                 logging.debug(f"Could not schedule after() call: {e}")
 
+    def make_combobox_clickable(self, combobox):
+        """Make entire combobox clickable, not just the arrow button."""
+        def open_dropdown(event):
+            # Trigger the dropdown to open
+            combobox._open_dropdown_menu()
+
+        # Bind click event to the entry part of the combobox
+        try:
+            # Access the internal entry widget and bind click event
+            if hasattr(combobox, '_entry'):
+                combobox._entry.configure(cursor="hand2")
+                combobox._entry.bind("<Button-1>", open_dropdown)
+        except (AttributeError, TclError) as e:
+            logging.debug(f"Could not make combobox clickable: {e}")
+
     def create_widgets(self):
         """Create main application widgets."""
 
@@ -146,6 +161,7 @@ class MainAppFrame(ctk.CTkFrame):
         self.library_combo = ctk.CTkComboBox(lib_select_frame, values=["Loading..."],
                                             command=self.on_library_change, state="readonly")
         self.library_combo.grid(row=0, column=0, sticky="ew", pady=(0, 5))
+        self.make_combobox_clickable(self.library_combo)
 
         self.refresh_browser_btn = ctk.CTkButton(lib_select_frame, text="🔄 Reload Library",
                                                 command=self.load_library_content, height=28)
@@ -284,6 +300,7 @@ class MainAppFrame(ctk.CTkFrame):
                                                  state="readonly", height=32)
         self.search_lang_combo.set("English")
         self.search_lang_combo.pack(fill="x", pady=(0, 10))
+        self.make_combobox_clickable(self.search_lang_combo)
 
         # Checkboxes
         checkbox_frame = ctk.CTkFrame(left_col, fg_color="transparent")
@@ -310,6 +327,7 @@ class MainAppFrame(ctk.CTkFrame):
                                              state="readonly", height=32)
         self.provider_combo.set("OpenSubtitles")
         self.provider_combo.pack(fill="x", pady=(0, 0))
+        self.make_combobox_clickable(self.provider_combo)
 
         # === ACTION BUTTONS ===
         actions_frame = ctk.CTkFrame(right_panel)
