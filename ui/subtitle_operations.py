@@ -60,8 +60,7 @@ class SubtitleOperations:
         if self.parent.confirm_batch_operations and len(items) >= self.parent.batch_operation_threshold:
             confirmed = self.parent.show_confirmation_dialog(
                 title="Search Subtitles",
-                message=f"Search for subtitles for {len(items)} items?",
-                item_count=len(items)
+                message=f"Search for subtitles for {len(items)} items?"
             )
             if not confirmed:
                 self.parent.update_status("Search cancelled")
@@ -206,8 +205,14 @@ class SubtitleOperations:
                         anchor="w").grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 5))
 
             # Subtitle options
-            selection_var = ctk.IntVar(value=0)  # Default to first subtitle
+            selection_var = ctk.IntVar(value=-1)  # Default to "Skip"
             self.subtitle_selections[item] = selection_var
+
+            # Add "Skip" option (selected by default)
+            skip_radio = ctk.CTkRadioButton(video_frame, text="⊗ Skip - Don't download subtitle for this item",
+                                           variable=selection_var, value=-1,
+                                           text_color=("gray50", "gray60"))
+            skip_radio.grid(row=2, column=0, sticky="w", padx=20, pady=(5, 2))
 
             for i, sub in enumerate(subs_list[:MAX_SUBTITLE_RESULTS], 0):  # Show top results
                 # Get subtitle info
@@ -224,16 +229,16 @@ class SubtitleOperations:
                 radio_text = f"[{provider_info}] {str(release_info)[:100]}"
                 radio = ctk.CTkRadioButton(video_frame, text=radio_text, variable=selection_var,
                                           value=i)
-                radio.grid(row=i+2, column=0, sticky="w", padx=20, pady=2)
+                radio.grid(row=i+3, column=0, sticky="w", padx=20, pady=2)
 
             if len(subs_list) > MAX_SUBTITLE_RESULTS:
                 ctk.CTkLabel(video_frame,
                             text=f"... and {len(subs_list) - MAX_SUBTITLE_RESULTS} more (showing top {MAX_SUBTITLE_RESULTS})",
                             font=ctk.CTkFont(size=11), text_color="gray").grid(
-                    row=MAX_SUBTITLE_RESULTS+2, column=0, sticky="w", padx=20, pady=(2, 10))
+                    row=MAX_SUBTITLE_RESULTS+3, column=0, sticky="w", padx=20, pady=(2, 10))
             else:
                 # Add padding at the end
-                ctk.CTkLabel(video_frame, text="").grid(row=len(subs_list)+2, column=0, pady=5)
+                ctk.CTkLabel(video_frame, text="").grid(row=len(subs_list)+3, column=0, pady=5)
 
             row += 1
 
@@ -275,6 +280,13 @@ class SubtitleOperations:
 
                 # Get selected subtitle index
                 selected_index = self.subtitle_selections[item].get()
+
+                # Skip if user selected "Skip" option (-1)
+                if selected_index == -1:
+                    self.parent.safe_after(0, lambda t=title:
+                        self.parent.log(f"Skipped: {t}"))
+                    continue
+
                 if selected_index >= len(subs_list):
                     continue
 
@@ -434,8 +446,7 @@ class SubtitleOperations:
         if self.parent.confirm_batch_operations and len(items) >= self.parent.batch_operation_threshold:
             confirmed = self.parent.show_confirmation_dialog(
                 title="Dry Run - Preview Available Subtitles",
-                message=f"Preview subtitle availability for {len(items)} items?\n(No subtitles will be downloaded)",
-                item_count=len(items)
+                message=f"Preview subtitle availability for {len(items)} items?\n(No subtitles will be downloaded)"
             )
             if not confirmed:
                 self.parent.update_status("Dry run cancelled")
@@ -724,8 +735,7 @@ class SubtitleOperations:
         if self.parent.confirm_batch_operations:
             confirmed = self.parent.show_confirmation_dialog(
                 title="Delete Subtitles",
-                message=f"Delete ALL subtitle streams from {len(items)} items?\n\nThis cannot be undone!",
-                item_count=len(items)
+                message=f"Delete ALL subtitle streams from {len(items)} items?\n\nThis cannot be undone!"
             )
             if not confirmed:
                 self.parent.update_status("Delete cancelled")

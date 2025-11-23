@@ -55,6 +55,7 @@ class MainAppFrame(ctk.CTkFrame):
         self.subtitle_status_filter = "all"  # Filter: "all", "missing", "has"
         self.all_movies = None  # Store all movies for filtering
         self.all_shows = None  # Store all shows for filtering
+        self.is_selecting = False  # Flag to track bulk selection operations in progress
 
         # Initialize configuration manager
         self.config_manager = ConfigManager()
@@ -137,6 +138,22 @@ class MainAppFrame(ctk.CTkFrame):
                 combobox._entry.bind("<Button-1>", open_dropdown)
         except (AttributeError, TclError) as e:
             logging.debug(f"Could not make combobox clickable: {e}")
+
+    def start_selection_operation(self, message="Selecting episodes..."):
+        """Start a bulk selection operation - show loading and disable buttons."""
+        self.is_selecting = True
+        self.selection_label.configure(text=message, text_color=("blue", "lightblue"))
+        self.disable_action_buttons()
+        self.select_all_btn.configure(state="disabled")
+        self.clear_selection_btn.configure(state="disabled")
+
+    def end_selection_operation(self):
+        """End a bulk selection operation - update label and enable buttons."""
+        self.is_selecting = False
+        self.update_selection_label()
+        self.enable_action_buttons()
+        self.select_all_btn.configure(state="normal")
+        self.clear_selection_btn.configure(state="normal")
 
     def create_widgets(self):
         """Create main application widgets."""
@@ -783,7 +800,17 @@ class MainAppFrame(ctk.CTkFrame):
         self.refresh_browser_btn.configure(state="disabled")
 
     def enable_action_buttons(self):
-        """Enable action buttons if items selected."""
+        """Enable action buttons if items selected and not selecting."""
+        # Disable all buttons if a selection operation is in progress
+        if self.is_selecting:
+            self.search_btn.configure(state="disabled")
+            self.list_btn.configure(state="disabled")
+            self.dry_run_btn.configure(state="disabled")
+            self.delete_subs_btn.configure(state="disabled")
+            self.download_btn.configure(state="disabled")
+            self.refresh_browser_btn.configure(state="disabled")
+            return
+
         state = "normal" if self.selected_items else "disabled"
         self.search_btn.configure(state=state)
         self.list_btn.configure(state=state)

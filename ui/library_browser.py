@@ -667,69 +667,95 @@ class LibraryBrowser:
     def on_show_selected(self, show, var, show_frame):
         """Handle show selection - select/deselect all episodes in show."""
         if var.get():
-            # Select all episodes in show
+            # Select all episodes in show (async with loading indicator)
             def select_all():
                 """Background thread to select all items."""
                 try:
+                    episodes = []
                     for season in show.seasons():
-                        for episode in season.episodes():
-                            if episode not in self.parent.selected_items:
-                                self.parent.selected_items.append(episode)
+                        episodes.extend(season.episodes())
 
-                    # Update UI selection count
-                    self.parent.safe_after(0, self.parent.update_selection_label)
+                    for episode in episodes:
+                        if episode not in self.parent.selected_items:
+                            self.parent.selected_items.append(episode)
+
+                    # End selection operation and update UI
+                    self.parent.safe_after(0, self.parent.end_selection_operation)
                 except Exception as e:
-                    self.parent.log(f"Error selecting episodes for {show.title}: {e}")
+                    self.parent.safe_after(0, lambda: self.parent.end_selection_operation())
+                    self.parent.safe_after(0, lambda: self.parent.log(f"Error selecting episodes for {show.title}: {e}"))
 
+            # Start selection operation
+            self.parent.start_selection_operation(f"Selecting episodes from {show.title}...")
             threading.Thread(target=select_all, daemon=True).start()
         else:
-            # Deselect all episodes in show
+            # Deselect all episodes in show (async with loading indicator)
             def deselect_all():
                 """Background thread to deselect all items."""
                 try:
+                    episodes = []
                     for season in show.seasons():
-                        for episode in season.episodes():
-                            if episode in self.parent.selected_items:
-                                self.parent.selected_items.remove(episode)
+                        episodes.extend(season.episodes())
 
-                    # Update UI selection count
-                    self.parent.safe_after(0, self.parent.update_selection_label)
+                    for episode in episodes:
+                        if episode in self.parent.selected_items:
+                            self.parent.selected_items.remove(episode)
+
+                    # End selection operation and update UI
+                    self.parent.safe_after(0, self.parent.end_selection_operation)
                 except Exception as e:
-                    self.parent.log(f"Error deselecting episodes for {show.title}: {e}")
+                    self.parent.safe_after(0, lambda: self.parent.end_selection_operation())
+                    self.parent.safe_after(0, lambda: self.parent.log(f"Error deselecting episodes for {show.title}: {e}"))
 
+            # Start selection operation
+            self.parent.start_selection_operation(f"Deselecting episodes from {show.title}...")
             threading.Thread(target=deselect_all, daemon=True).start()
 
     def on_season_selected(self, season, var, season_frame):
         """Handle season selection - select/deselect all episodes in season."""
         if var.get():
-            # Select all episodes in season
+            # Select all episodes in season (async with loading indicator)
             def select_all():
                 """Background thread to select all items."""
                 try:
-                    for episode in season.episodes():
+                    episodes = season.episodes()
+                    for episode in episodes:
                         if episode not in self.parent.selected_items:
                             self.parent.selected_items.append(episode)
 
-                    # Update UI selection count
-                    self.parent.safe_after(0, self.parent.update_selection_label)
+                    # Update episode checkboxes if season is expanded
+                    self.parent.safe_after(0, lambda: self._update_episode_checkboxes_in_season(season_frame, episodes, True))
+                    # End selection operation and update UI
+                    self.parent.safe_after(0, self.parent.end_selection_operation)
                 except Exception as e:
-                    self.parent.log(f"Error selecting episodes for {season.title}: {e}")
+                    self.parent.safe_after(0, lambda: self.parent.end_selection_operation())
+                    self.parent.safe_after(0, lambda: self.parent.log(f"Error selecting episodes for {season.title}: {e}"))
 
+            # Start selection operation
+            season_title = f"Season {season.seasonNumber}" if hasattr(season, 'seasonNumber') else season.title
+            self.parent.start_selection_operation(f"Selecting episodes from {season_title}...")
             threading.Thread(target=select_all, daemon=True).start()
         else:
-            # Deselect all episodes in season
+            # Deselect all episodes in season (async with loading indicator)
             def deselect_all():
                 """Background thread to deselect all items."""
                 try:
-                    for episode in season.episodes():
+                    episodes = season.episodes()
+                    for episode in episodes:
                         if episode in self.parent.selected_items:
                             self.parent.selected_items.remove(episode)
 
-                    # Update UI selection count
-                    self.parent.safe_after(0, self.parent.update_selection_label)
+                    # Update episode checkboxes if season is expanded
+                    self.parent.safe_after(0, lambda: self._update_episode_checkboxes_in_season(season_frame, episodes, False))
+                    # End selection operation and update UI
+                    self.parent.safe_after(0, self.parent.end_selection_operation)
                 except Exception as e:
-                    self.parent.log(f"Error deselecting episodes for {season.title}: {e}")
+                    self.parent.safe_after(0, lambda: self.parent.end_selection_operation())
+                    self.parent.safe_after(0, lambda: self.parent.log(f"Error deselecting episodes for {season.title}: {e}"))
 
+            # Start selection operation
+            season_title = f"Season {season.seasonNumber}" if hasattr(season, 'seasonNumber') else season.title
+            self.parent.start_selection_operation(f"Deselecting episodes from {season_title}...")
             threading.Thread(target=deselect_all, daemon=True).start()
 
     def select_all_items(self):
@@ -750,12 +776,17 @@ class LibraryBrowser:
                                 if episode not in self.parent.selected_items:
                                     self.parent.selected_items.append(episode)
 
-                self.parent.safe_after(0, self.parent.update_selection_label)
+                # End selection operation and update UI
+                self.parent.safe_after(0, self.parent.end_selection_operation)
                 self.parent.safe_after(0, lambda: self.parent.update_status(
                     f"Selected {len(self.parent.selected_items)} item(s)"))
             except Exception as e:
-                self.parent.log(f"Error selecting all items: {e}")
+                self.parent.safe_after(0, lambda: self.parent.end_selection_operation())
+                self.parent.safe_after(0, lambda: self.parent.log(f"Error selecting all items: {e}"))
 
+        # Start selection operation
+        item_type = "movies" if self.all_movies else "shows"
+        self.parent.start_selection_operation(f"Selecting all {item_type}...")
         threading.Thread(target=task, daemon=True).start()
 
     def clear_selection(self):
@@ -962,3 +993,40 @@ class LibraryBrowser:
             self.load_movie_page(self.current_page)
         elif self.all_shows:
             self.load_show_page(self.current_page)
+
+    def _update_episode_checkboxes_in_season(self, season_frame, episodes, checked):
+        """
+        Update episode checkboxes to match the checked state.
+
+        Args:
+            season_frame: The season frame widget containing episode checkboxes
+            episodes: List of episode objects that were selected/deselected
+            checked: True to check boxes, False to uncheck
+        """
+        try:
+            # Build a set of episode ratingKeys for quick lookup
+            episode_keys = {ep.ratingKey for ep in episodes}
+
+            # Find all episode frames in the season (row > 0)
+            for widget in season_frame.winfo_children():
+                # Episode frames are CTkFrame widgets at row > 0
+                if isinstance(widget, ctk.CTkFrame):
+                    row_info = widget.grid_info()
+                    if row_info and row_info.get('row', 0) > 0:
+                        # Find the checkbox in this episode frame
+                        for child in widget.winfo_children():
+                            if isinstance(child, ctk.CTkCheckBox):
+                                # This is an episode checkbox
+                                # We need to update its variable to match the checked state
+                                # The checkbox's command was bound with the episode, but we can't
+                                # easily access it, so we'll just set the variable
+                                # Since we're updating based on selected_items, we should check
+                                # if any of our episodes match this checkbox
+
+                                # Get the checkbox's variable and update it
+                                checkbox_var = child.cget("variable")
+                                if checkbox_var:
+                                    checkbox_var.set(checked)
+                                break
+        except Exception as e:
+            logging.debug(f"Error updating episode checkboxes: {e}")
