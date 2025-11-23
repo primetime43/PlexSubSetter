@@ -593,19 +593,44 @@ class LibraryBrowser:
             expand_btn.configure(text="▶")
             self.season_frames[season] = (season_frame, var, False)
         else:
-            # Expand - load episodes
+            # Check if already loading (prevent rapid clicks)
+            if hasattr(self, '_loading_seasons') and season in self._loading_seasons:
+                return
+
+            # Mark as loading
+            if not hasattr(self, '_loading_seasons'):
+                self._loading_seasons = set()
+            self._loading_seasons.add(season)
+
+            # Update button to show loading
             expand_btn = season_frame.winfo_children()[0]
-            expand_btn.configure(text="▼")
-            self.season_frames[season] = (season_frame, var, True)
+            expand_btn.configure(text="⏳")
+            expand_btn.configure(state="disabled")
 
             # Load episodes in background
             def load_episodes():
                 """Background thread to load episodes for the season."""
                 try:
                     episodes = season.episodes()
-                    self.parent.safe_after(0, lambda: self.populate_episodes(season_frame, episodes))
+                    def finish_load():
+                        # Mark as expanded
+                        self.season_frames[season] = (season_frame, var, True)
+                        # Update button
+                        expand_btn.configure(text="▼", state="normal")
+                        # Populate episodes
+                        self.populate_episodes(season_frame, episodes)
+                        # Remove from loading set
+                        self._loading_seasons.discard(season)
+
+                    self.parent.safe_after(0, finish_load)
                 except Exception as e:
-                    self.parent.log(f"Error loading episodes for {season.title}: {e}")
+                    def handle_error():
+                        self.parent.log(f"Error loading episodes for {season.title}: {e}")
+                        # Reset button on error
+                        expand_btn.configure(text="▶", state="normal")
+                        self._loading_seasons.discard(season)
+
+                    self.parent.safe_after(0, handle_error)
 
             threading.Thread(target=load_episodes, daemon=True).start()
 
