@@ -40,6 +40,21 @@ class SettingsDialog:
         self.settings_window = None
         self.settings_vars = {}
 
+    def make_combobox_clickable(self, combobox):
+        """Make entire combobox clickable, not just the arrow button."""
+        def open_dropdown(event):
+            # Trigger the dropdown to open
+            combobox._open_dropdown_menu()
+
+        # Bind click event to the entry part of the combobox
+        try:
+            # Access the internal entry widget and bind click event
+            if hasattr(combobox, '_entry'):
+                combobox._entry.configure(cursor="hand2")
+                combobox._entry.bind("<Button-1>", open_dropdown)
+        except Exception:
+            pass  # Silently fail if binding doesn't work
+
     def show(self):
         """Display the settings dialog."""
         self.settings_window = ctk.CTkToplevel(self.parent)
@@ -100,6 +115,7 @@ class SettingsDialog:
         lang_combo = ctk.CTkComboBox(scroll, values=list(SEARCH_LANGUAGES.keys()),
                                      variable=self.settings_vars['default_language'], state="readonly")
         lang_combo.pack(fill="x", pady=(0, 5))
+        self.make_combobox_clickable(lang_combo)
         ctk.CTkLabel(scroll, text="Language used when searching for subtitles",
                     font=ctk.CTkFont(size=11), text_color="gray").pack(anchor="w", pady=(0, 15))
 
