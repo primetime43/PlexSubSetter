@@ -133,7 +133,7 @@ class LoginFrame(ctk.CTkFrame):
 
                 # Get OAuth URL
                 oauth_url = self.pin_login.oauthUrl()
-                logging.info(f"OAuth URL generated: {oauth_url[:50]}...")
+                logging.info(f"OAuth URL generated: {oauth_url}")
 
                 # Update UI
                 self.after(0, lambda: self.status_label.configure(

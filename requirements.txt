@@ -1,4 +1,4 @@
-plexapi>=4.15.0
-customtkinter>=5.2.0
-subliminal>=2.1.0
-babelfish>=0.6.0
+plexapi==4.17.0
+customtkinter==5.2.2
+subliminal==2.4.0
+babelfish==0.6.1

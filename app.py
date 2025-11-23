@@ -8,18 +8,31 @@ import customtkinter as ctk
 import logging
 from tkinter import TclError
 
-# Import UI components
-from ui.login_frame import LoginFrame
-from ui.server_selection_frame import ServerSelectionFrame
-from ui.main_app_frame import MainAppFrame
+# Fix PlexAPI client identifier for packaged .exe files
+# Without this, PyInstaller causes PlexAPI to use a memory address instead of a proper client ID
+import plexapi
 
-# Import utilities
+# Import version before setting PlexAPI config
 from utils.constants import (
     __version__, __author__, __repo__,
     WINDOW_LOGIN_MIN_WIDTH, WINDOW_LOGIN_MIN_HEIGHT, WINDOW_LOGIN_WIDTH, WINDOW_LOGIN_HEIGHT,
     WINDOW_SERVER_MIN_WIDTH, WINDOW_SERVER_MIN_HEIGHT, WINDOW_SERVER_WIDTH, WINDOW_SERVER_HEIGHT,
     WINDOW_MAIN_MIN_WIDTH, WINDOW_MAIN_MIN_HEIGHT, WINDOW_MAIN_WIDTH, WINDOW_MAIN_HEIGHT
 )
+
+# Set PlexAPI client headers
+plexapi.X_PLEX_IDENTIFIER = "PlexSubSetter"
+plexapi.X_PLEX_PRODUCT = "PlexSubSetter"
+plexapi.X_PLEX_VERSION = __version__
+plexapi.X_PLEX_DEVICE = "PC"
+plexapi.X_PLEX_PLATFORM = "Windows"
+
+# Import UI components
+from ui.login_frame import LoginFrame
+from ui.server_selection_frame import ServerSelectionFrame
+from ui.main_app_frame import MainAppFrame
+
+# Import other utilities
 from utils.logging_config import setup_logging
 
 
@@ -29,6 +42,11 @@ ctk.set_default_color_theme("blue")
 
 # Initialize logging
 current_log_file = setup_logging()
+
+# Log PlexAPI client configuration
+logging.info(f"PlexAPI Client ID: {plexapi.X_PLEX_IDENTIFIER}")
+logging.info(f"PlexAPI Product: {plexapi.X_PLEX_PRODUCT}")
+logging.info(f"PlexAPI Version: {plexapi.X_PLEX_VERSION}")
 
 
 class PlexSubSetterApp(ctk.CTk):
