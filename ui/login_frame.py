@@ -5,6 +5,7 @@ Login frame for Plex OAuth authentication.
 import customtkinter as ctk
 import threading
 import webbrowser
+import logging
 from plexapi.myplex import MyPlexAccount, MyPlexPinLogin
 from utils.constants import (
     __version__, __author__, __repo__, OAUTH_LOGIN_TIMEOUT,
@@ -86,8 +87,35 @@ class LoginFrame(ctk.CTkFrame):
         repo_label = ctk.CTkLabel(footer_frame, text="View on GitHub",
                                   font=ctk.CTkFont(size=10, underline=True),
                                   text_color=COLOR_LINK_BLUE, cursor="hand2")
-        repo_label.pack()
+        repo_label.pack(pady=(0, 10))
         repo_label.bind("<Button-1>", lambda e: webbrowser.open(__repo__))
+
+        # Show Logs button
+        logs_btn = ctk.CTkButton(footer_frame, text="📋 Open Logs Folder",
+                                command=self.open_logs_folder, height=28,
+                                width=150, fg_color="transparent", border_width=1,
+                                text_color=("gray10", "gray90"))
+        logs_btn.pack()
+
+    def open_logs_folder(self):
+        """Open the logs folder in file explorer."""
+        import os
+        import subprocess
+        import platform
+
+        logs_dir = "logs"
+        if not os.path.exists(logs_dir):
+            os.makedirs(logs_dir)
+
+        try:
+            if platform.system() == "Windows":
+                os.startfile(logs_dir)
+            elif platform.system() == "Darwin":  # macOS
+                subprocess.Popen(["open", logs_dir])
+            else:  # Linux
+                subprocess.Popen(["xdg-open", logs_dir])
+        except Exception as e:
+            logging.error(f"Failed to open logs folder: {e}")
 
     def start_oauth_login(self):
         """Start the OAuth login process."""
@@ -97,11 +125,15 @@ class LoginFrame(ctk.CTkFrame):
         def oauth_thread():
             """Background thread to handle OAuth authentication process."""
             try:
+                logging.info("Starting OAuth login process...")
+
                 # Create PIN login with OAuth
                 self.pin_login = MyPlexPinLogin(oauth=True)
+                logging.info("PIN login created successfully")
 
                 # Get OAuth URL
                 oauth_url = self.pin_login.oauthUrl()
+                logging.info(f"OAuth URL generated: {oauth_url[:50]}...")
 
                 # Update UI
                 self.after(0, lambda: self.status_label.configure(
@@ -111,6 +143,7 @@ class LoginFrame(ctk.CTkFrame):
                 self.after(0, lambda: self.login_btn.configure(text="Waiting for sign in..."))
 
                 # Open browser
+                logging.info("Opening browser for OAuth...")
                 webbrowser.open(oauth_url)
 
                 # Wait for login with callback
@@ -122,18 +155,25 @@ class LoginFrame(ctk.CTkFrame):
                         token: OAuth token received from Plex, or None if login failed
                     """
                     if token:
+                        logging.info("OAuth token received successfully")
                         try:
+                            logging.info("Attempting to create account from token...")
                             account = MyPlexAccount(token=token)
+                            logging.info(f"Successfully authenticated as: {account.username}")
                             self.after(0, lambda: self.on_login_success(account))
                         except Exception as e:
+                            logging.error(f"Failed to get account from token: {e}", exc_info=True)
                             self.after(0, lambda: self.handle_error(f"Failed to get account: {e}"))
                     else:
+                        logging.warning("OAuth login failed or timed out (no token received)")
                         self.after(0, lambda: self.handle_error("Login failed or timed out"))
 
                 # Run with timeout of 5 minutes
+                logging.info(f"Waiting for OAuth callback (timeout: {OAUTH_LOGIN_TIMEOUT}s)...")
                 self.pin_login.run(callback=on_login, timeout=OAUTH_LOGIN_TIMEOUT)
 
             except Exception as e:
+                logging.error(f"OAuth login error: {e}", exc_info=True)
                 self.after(0, lambda: self.handle_error(str(e)))
 
         threading.Thread(target=oauth_thread, daemon=True).start()
