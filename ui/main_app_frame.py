@@ -297,10 +297,15 @@ class MainAppFrame(ctk.CTkFrame):
                                     text_color=("gray10", "gray90"))
         settings_btn.grid(row=0, column=1, padx=(15, 5), pady=15)
 
+        log_btn = ctk.CTkButton(header_frame, text="📋 Show Log", command=self.show_log_modal,
+                               width=100, fg_color="transparent", border_width=2,
+                               text_color=("gray10", "gray90"))
+        log_btn.grid(row=0, column=2, padx=(5, 5), pady=15)
+
         logout_btn = ctk.CTkButton(header_frame, text="Change Server", command=self.on_logout,
                                    width=120, fg_color="transparent", border_width=2,
                                    text_color=("gray10", "gray90"))
-        logout_btn.grid(row=0, column=2, padx=(5, 15), pady=15)
+        logout_btn.grid(row=0, column=3, padx=(5, 15), pady=15)
 
         # === SUBTITLE OPTIONS ===
         options_frame = ctk.CTkFrame(right_panel)
@@ -350,7 +355,7 @@ class MainAppFrame(ctk.CTkFrame):
         actions_frame = ctk.CTkFrame(right_panel)
         actions_frame.grid(row=2, column=0, sticky="ew", pady=10)
 
-        for i in range(3):
+        for i in range(2):
             actions_frame.grid_columnconfigure(i, weight=1)
 
         self.search_btn = ctk.CTkButton(actions_frame, text="🔍 Search Available",
@@ -358,15 +363,10 @@ class MainAppFrame(ctk.CTkFrame):
                                        state="disabled")
         self.search_btn.grid(row=0, column=0, padx=5, pady=15, sticky="ew")
 
-        self.download_btn = ctk.CTkButton(actions_frame, text="⬇ Download Selected",
-                                         command=self.download_subtitles, height=40,
-                                         state="disabled")
-        self.download_btn.grid(row=0, column=1, padx=5, pady=15, sticky="ew")
-
         self.list_btn = ctk.CTkButton(actions_frame, text="📋 List Current",
                                      command=self.list_subtitles, height=40,
                                      state="disabled")
-        self.list_btn.grid(row=0, column=2, padx=5, pady=15, sticky="ew")
+        self.list_btn.grid(row=0, column=1, padx=5, pady=15, sticky="ew")
 
         # Second row for dry run and delete buttons
         self.dry_run_btn = ctk.CTkButton(actions_frame, text="👁 Dry Run (Preview Missing)",
@@ -409,53 +409,25 @@ class MainAppFrame(ctk.CTkFrame):
         self.info_scroll.grid(row=1, column=0, sticky="nsew", padx=15, pady=(0, 15))
         self.info_scroll.grid_columnconfigure(0, weight=1)
 
-        # === STATUS BAR ===
-        status_frame = ctk.CTkFrame(right_panel, fg_color=("gray85", "gray20"), height=30)
-        status_frame.grid(row=4, column=0, sticky="ew")
-        status_frame.grid_columnconfigure(0, weight=1)
-        status_frame.grid_propagate(False)
+        # === DOWNLOAD BUTTON ===
+        download_frame = ctk.CTkFrame(right_panel, fg_color="transparent")
+        download_frame.grid(row=4, column=0, sticky="ew", pady=(10, 0))
+        download_frame.grid_columnconfigure(0, weight=1)
 
-        self.status_label = ctk.CTkLabel(status_frame, text="Ready",
-                                         font=ctk.CTkFont(size=11),
-                                         anchor="w")
-        self.status_label.pack(side="left", padx=15, pady=5)
+        self.download_btn = ctk.CTkButton(download_frame, text="⬇ Download Selected",
+                                         command=self.download_subtitles, height=40,
+                                         state="disabled")
+        self.download_btn.grid(row=0, column=0, padx=15, pady=10, sticky="ew")
 
-        # === OUTPUT LOG (Smaller, collapsible) ===
-        self.log_container = ctk.CTkFrame(right_panel)
-        self.log_container.grid(row=5, column=0, sticky="nsew", pady=(10, 0))
-        self.log_container.grid_columnconfigure(0, weight=1)
-        self.log_container.grid_rowconfigure(1, weight=1)  # Log text frame can expand
+        # Keep status label hidden (used internally for status updates in logs)
+        self.status_label = ctk.CTkLabel(right_panel, text="Ready")
+        # Don't grid it - just keep it for compatibility with existing code
 
-        log_header = ctk.CTkFrame(self.log_container, fg_color="transparent")
-        log_header.grid(row=0, column=0, sticky="ew", padx=15, pady=(10, 5))
-        log_header.grid_columnconfigure(1, weight=1)
-
-        self.log_toggle_btn = ctk.CTkButton(log_header, text="▼ Log", command=self.toggle_log,
-                                           width=80, height=24, fg_color="transparent",
-                                           border_width=1, anchor="w",
-                                           text_color=("gray10", "gray90"))
-        self.log_toggle_btn.grid(row=0, column=0, sticky="w")
-
-        # Log file path label
-        log_file_label = ctk.CTkLabel(log_header, text=f"📄 Log file: {self.current_log_file}",
-                                      font=ctk.CTkFont(size=10), text_color="gray")
-        log_file_label.grid(row=0, column=1, sticky="w", padx=10)
-
-        clear_btn = ctk.CTkButton(log_header, text="Clear", command=self.clear_log,
-                                 width=60, height=24, fg_color="transparent",
-                                 text_color=("gray10", "gray90"))
-        clear_btn.grid(row=0, column=2, sticky="e")
-
-        # Text widget with proper wrapping (smaller)
-        self.log_text_frame = ctk.CTkFrame(self.log_container)
-        self.log_text_frame.grid(row=1, column=0, sticky="nsew", padx=15, pady=(0, 10))
-        self.log_text_frame.grid_columnconfigure(0, weight=1)
-        self.log_text_frame.grid_rowconfigure(0, weight=1)
-        self.log_text_frame.grid_remove()  # Start collapsed
-
-        self.output_text = ctk.CTkTextbox(self.log_text_frame, wrap="word",
+        # === OUTPUT LOG (Hidden - shown in modal) ===
+        # Keep a hidden textbox to store log messages for the modal
+        self.output_text = ctk.CTkTextbox(right_panel, wrap="word",
                                           font=ctk.CTkFont(size=11))
-        self.output_text.pack(fill="both", expand=True, padx=2, pady=2)
+        # Don't grid it - keep it hidden, only for storing log content
 
         # === PROGRESS BAR ===
         self.progress_bar = ctk.CTkProgressBar(right_panel, mode="indeterminate")
@@ -490,18 +462,7 @@ class MainAppFrame(ctk.CTkFrame):
 
     def clear_log(self):
         """Clear the output log."""
-        self.output_text.configure(state="normal")
         self.output_text.delete("1.0", "end")
-        self.output_text.configure(state="disabled")
-
-    def toggle_log(self):
-        """Toggle log visibility."""
-        if self.log_text_frame.winfo_viewable():
-            self.log_text_frame.grid_remove()
-            self.log_toggle_btn.configure(text="▶ Log")
-        else:
-            self.log_text_frame.grid()
-            self.log_toggle_btn.configure(text="▼ Log")
 
     def update_status(self, message):
         """Update status bar message."""
@@ -925,6 +886,75 @@ class MainAppFrame(ctk.CTkFrame):
             log_file_path=self.current_log_file
         )
         dialog.show()
+
+    def show_log_modal(self):
+        """Show log in a modal dialog window."""
+        # Create modal window
+        log_window = ctk.CTkToplevel(self)
+        log_window.title("PlexSubSetter Log")
+        log_window.geometry("900x600")
+        log_window.transient(self)
+        log_window.grab_set()
+
+        # Center window
+        log_window.update_idletasks()
+        x = (log_window.winfo_screenwidth() // 2) - (900 // 2)
+        y = (log_window.winfo_screenheight() // 2) - (600 // 2)
+        log_window.geometry(f"900x600+{x}+{y}")
+
+        # Main container
+        main_frame = ctk.CTkFrame(log_window)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        main_frame.grid_columnconfigure(0, weight=1)
+        main_frame.grid_rowconfigure(1, weight=1)
+
+        # Header with title and log file path
+        header_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        header_frame.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+        header_frame.grid_columnconfigure(0, weight=1)
+
+        title_label = ctk.CTkLabel(header_frame, text="📋 Application Log",
+                                   font=ctk.CTkFont(size=18, weight="bold"))
+        title_label.grid(row=0, column=0, sticky="w", pady=(0, 5))
+
+        log_file_label = ctk.CTkLabel(header_frame, text=f"Log file: {self.current_log_file}",
+                                      font=ctk.CTkFont(size=11), text_color="gray")
+        log_file_label.grid(row=1, column=0, sticky="w")
+
+        # Log text area
+        log_text = ctk.CTkTextbox(main_frame, wrap="word", font=ctk.CTkFont(size=11))
+        log_text.grid(row=1, column=0, sticky="nsew", pady=(0, 10))
+
+        # Copy content from hidden output_text
+        log_text.insert("1.0", self.output_text.get("1.0", "end-1c"))
+        log_text.configure(state="disabled")  # Make read-only
+
+        # Auto-scroll to bottom
+        log_text.see("end")
+
+        # Buttons frame
+        btn_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        btn_frame.grid(row=2, column=0, sticky="ew")
+        btn_frame.grid_columnconfigure(0, weight=1)
+
+        # Clear button
+        clear_btn = ctk.CTkButton(btn_frame, text="Clear Log", command=lambda: self._clear_log_in_modal(log_text),
+                                 width=100)
+        clear_btn.grid(row=0, column=0, sticky="w")
+
+        # Close button
+        close_btn = ctk.CTkButton(btn_frame, text="Close", command=log_window.destroy,
+                                 width=100)
+        close_btn.grid(row=0, column=1, sticky="e", padx=(10, 0))
+
+    def _clear_log_in_modal(self, log_text_widget):
+        """Clear log in both modal and hidden output_text."""
+        # Clear hidden output_text
+        self.output_text.delete("1.0", "end")
+        # Clear modal log_text
+        log_text_widget.configure(state="normal")
+        log_text_widget.delete("1.0", "end")
+        log_text_widget.configure(state="disabled")
 
     def _apply_settings(self, updated_settings):
         """Apply settings from dialog.
