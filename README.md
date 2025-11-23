@@ -27,6 +27,7 @@ Whether you're missing subtitles on a few episodes or want to add them to your e
 - **Manage Existing Subtitles** - View, activate, or delete subtitle streams
 - **Multi-Language Support** - Download subtitles in any language
 
+v1.0.0
   <img width="1202" height="882" alt="image" src="https://github.com/user-attachments/assets/20ca72a8-eb67-488a-955d-96b16dd087ca" />
 
 
