@@ -3,7 +3,7 @@ Constants and configuration values for PlexSubSetter.
 """
 
 # Application metadata
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __author__ = "primetime43"
 __repo__ = "https://github.com/primetime43/PlexSubSetter"
 
