@@ -165,6 +165,15 @@ def season_episodes(name, rating_key):
         season = state.plex.fetchItem(rating_key)
         episodes = library_service.get_episodes(season)
         selected_keys = state.get_selected_keys()
+
+        # Check subtitle status synchronously for uncached episodes.
+        # A season is typically 10-25 episodes — checking in parallel is fast
+        # and avoids SSE race conditions where events arrive before DOM is ready.
+        cache = state.subtitle_status_cache
+        uncached = [ep for ep in episodes if ep.ratingKey not in cache]
+        if uncached:
+            library_service.batch_check_subtitles_sync(uncached, state)
+
         return render_template('partials/season_episodes.html',
                                episodes=episodes,
                                library_name=name,

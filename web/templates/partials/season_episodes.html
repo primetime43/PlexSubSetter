@@ -7,16 +7,16 @@
            {% if ep.ratingKey in selected_keys %}checked{% endif %}
            onchange="window.toggleItem(this)">
     <span class="flex-1 text-xs truncate text-gray-300">
-        E{{ '%02d' % ep.index }} - {{ ep.title }}
+        E{{ '%02d' % (ep.index or 0) }} - {{ ep.title }}
     </span>
     {% if ep.ratingKey in subtitle_cache %}
         {% if subtitle_cache[ep.ratingKey] %}
-        <span class="text-green-500 font-bold text-xs">&#10003;</span>
+        <span class="sub-indicator text-green-500 font-bold text-xs" title="Has subtitles">&#10003;</span>
         {% else %}
-        <span class="text-red-500 text-xs">&#10007;</span>
+        <span class="sub-indicator text-red-500 text-xs" title="No subtitles">&#10007;</span>
         {% endif %}
     {% else %}
-    <span class="text-gray-600 text-xs">...</span>
+    <span class="sub-indicator text-gray-600 text-xs" title="Checking...">...</span>
     {% endif %}
 </div>
 {% endfor %}
