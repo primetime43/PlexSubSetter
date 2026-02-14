@@ -6,7 +6,6 @@ Extracted from ui/login_frame.py. No UI dependencies.
 
 import logging
 from plexapi.myplex import MyPlexAccount, MyPlexPinLogin
-from utils.constants import OAUTH_LOGIN_TIMEOUT
 
 
 def start_oauth():
@@ -47,30 +46,3 @@ def poll_oauth(pin_login):
     return None
 
 
-def wait_for_oauth(pin_login, timeout=OAUTH_LOGIN_TIMEOUT):
-    """
-    Blocking wait for OAuth completion (used for background thread approach).
-
-    Args:
-        pin_login: MyPlexPinLogin instance
-        timeout: Max seconds to wait
-
-    Returns:
-        MyPlexAccount if authenticated, None if timed out
-    """
-    token = None
-
-    def on_login(t):
-        nonlocal token
-        token = t
-
-    pin_login.run(callback=on_login, timeout=timeout)
-
-    if token:
-        logging.info("OAuth token received successfully")
-        account = MyPlexAccount(token=token)
-        logging.info(f"Successfully authenticated as: {account.username}")
-        return account
-
-    logging.warning("OAuth login failed or timed out")
-    return None

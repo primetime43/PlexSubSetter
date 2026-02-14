@@ -37,10 +37,6 @@ SUBTITLE_PROVIDERS = {
     "Subscene": "subscene"
 }
 
-# UI Configuration
-ITEMS_PER_PAGE = 50  # Pagination size for large libraries
-MAX_TITLE_LENGTH = 60  # Maximum title length before truncation
-
 # Subtitle Search Configuration
 MAX_SUBTITLE_RESULTS = 10  # Maximum number of subtitle options to display per item
 DEFAULT_SEARCH_TIMEOUT = 30  # Default subtitle search timeout in seconds
@@ -56,9 +52,6 @@ DEFAULT_RETRY_ATTEMPTS = 2  # Default retry attempts for library operations
 CRITICAL_RETRY_ATTEMPTS = 3  # Retry attempts for critical operations (server connection)
 DEFAULT_RETRY_DELAY = 2.0  # Initial delay between retries in seconds
 CRITICAL_RETRY_DELAY = 1.0  # Initial delay for critical operations
-
-# Authentication Configuration
-OAUTH_LOGIN_TIMEOUT = 300  # OAuth login timeout in seconds (5 minutes)
 
 # Configuration File
 CONFIG_FILE_PATH = 'config.ini'  # Path to application configuration file

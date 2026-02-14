@@ -5,16 +5,13 @@ Extracted from ui/library_browser.py. No UI dependencies.
 """
 
 import logging
-import threading
 from concurrent.futures import ThreadPoolExecutor
-from plexapi.video import Movie, Episode, Show, Season
+from plexapi.video import Movie, Episode
 
 from error_handling import (
     retry_with_backoff,
     PlexConnectionError,
     PlexAuthenticationError,
-    ErrorContext,
-    get_crash_reporter,
 )
 from utils.constants import DEFAULT_RETRY_ATTEMPTS, DEFAULT_RETRY_DELAY
 

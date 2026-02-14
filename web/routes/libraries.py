@@ -4,7 +4,7 @@ import logging
 from flask import Blueprint, render_template, jsonify, redirect, url_for, request, current_app
 
 from core import library_service
-from plexapi.video import Movie, Episode, Show, Season
+from plexapi.video import Movie
 from utils.constants import SEARCH_LANGUAGES, SUBTITLE_PROVIDERS
 
 libraries_bp = Blueprint('libraries', __name__)

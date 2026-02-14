@@ -5,7 +5,6 @@ Extracted from ui/subtitle_operations.py. No UI dependencies.
 """
 
 import os
-import sys
 import tempfile
 import logging
 

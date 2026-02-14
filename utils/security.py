@@ -191,44 +191,6 @@ def sanitize_subtitle_filename(item, language_code: str) -> str:
     return sanitize_filename(filename)
 
 
-def validate_file_size(file_path: Union[str, Path],
-                       max_size: int = MAX_SUBTITLE_SIZE) -> bool:
-    """
-    Check if file size is within acceptable limits.
-
-    Args:
-        file_path: Path to file to check
-        max_size: Maximum allowed size in bytes (default: 10MB)
-
-    Returns:
-        bool: True if file size is acceptable
-
-    Raises:
-        ValueError: If file exceeds maximum size
-        FileNotFoundError: If file doesn't exist
-
-    Examples:
-        >>> validate_file_size('subtitle.srt')
-        True
-        >>> validate_file_size('huge_file.srt', max_size=1024)
-        ValueError: File exceeds maximum size
-    """
-    file_path = Path(file_path)
-
-    if not file_path.exists():
-        raise FileNotFoundError(f"File not found: {file_path}")
-
-    file_size = file_path.stat().st_size
-
-    if file_size > max_size:
-        raise ValueError(
-            f"File exceeds maximum size: {file_size:,} bytes "
-            f"(max: {max_size:,} bytes)"
-        )
-
-    return True
-
-
 def validate_subtitle_content_size(content: bytes,
                                    max_size: int = MAX_SUBTITLE_SIZE) -> bool:
     """

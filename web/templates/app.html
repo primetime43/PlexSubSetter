@@ -2,7 +2,7 @@
 {% block title_suffix %} - {{ server_name }}{% endblock %}
 
 {% block body %}
-<div class="h-screen flex flex-col" x-data="appState()" sse-connect="/events">
+<div class="h-screen flex flex-col" x-data="appState()">
     <!-- Top header bar -->
     <header class="bg-gray-900 border-b border-gray-800 px-6 py-3 flex items-center justify-between flex-shrink-0">
         <h1 class="text-xl font-bold">
