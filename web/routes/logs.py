@@ -29,3 +29,23 @@ def get_logs():
     return render_template('partials/log_modal.html',
                            log_content=content,
                            log_file=log_file or "No log file")
+
+
+@logs_bp.route('/logs/content')
+def get_log_content():
+    """Get raw log text for live refresh (no HTML wrapper)."""
+    log_file = current_app.state.current_log_file
+    content = ""
+    if log_file and os.path.exists(log_file):
+        try:
+            file_size = os.path.getsize(log_file)
+            with open(log_file, 'r', encoding='utf-8', errors='replace') as f:
+                if file_size > _MAX_LOG_TAIL:
+                    f.seek(file_size - _MAX_LOG_TAIL)
+                    f.readline()
+                content = f.read()
+        except Exception as e:
+            content = f"Error reading log file: {e}"
+
+    from flask import Response
+    return Response(content or "No log content available.", mimetype='text/plain')

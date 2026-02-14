@@ -42,6 +42,7 @@ function appState() {
 
         // Log refresh
         _logInterval: null,
+        _logFirstLoad: true,
 
         init() {
             // Load libraries on init
@@ -50,8 +51,9 @@ function appState() {
             // Auto-refresh logs while modal is open
             this.$watch('showLogs', (open) => {
                 if (open) {
-                    this._refreshLogs();
-                    this._logInterval = setInterval(() => this._refreshLogs(), 3000);
+                    this._logFirstLoad = true;
+                    this._loadLogModal();
+                    this._logInterval = setInterval(() => this._refreshLogContent(), 3000);
                 } else if (this._logInterval) {
                     clearInterval(this._logInterval);
                     this._logInterval = null;
@@ -59,17 +61,35 @@ function appState() {
             });
         },
 
-        async _refreshLogs() {
+        async _loadLogModal() {
+            // First load: fetch full modal HTML
             const container = document.getElementById('log-modal-content');
             if (!container) return;
             try {
                 const resp = await fetch('/logs');
                 if (resp.ok) {
                     container.innerHTML = await resp.text();
+                    // Scroll to bottom on first open
+                    const logArea = document.getElementById('log-content-area');
+                    if (logArea) logArea.scrollTop = logArea.scrollHeight;
+                    this._logFirstLoad = false;
                 }
-            } catch (e) {
-                // silently fail — modal may have closed
-            }
+            } catch (e) { /* modal may have closed */ }
+        },
+
+        async _refreshLogContent() {
+            // Subsequent refreshes: only update text, preserve scroll
+            const logArea = document.getElementById('log-content-area');
+            if (!logArea) return;
+            try {
+                const resp = await fetch('/logs/content');
+                if (resp.ok) {
+                    const wasAtBottom = (logArea.scrollHeight - logArea.scrollTop - logArea.clientHeight) < 30;
+                    logArea.textContent = await resp.text();
+                    // Only auto-scroll if user was already at the bottom
+                    if (wasAtBottom) logArea.scrollTop = logArea.scrollHeight;
+                }
+            } catch (e) { /* modal may have closed */ }
         },
 
         async loadLibraries() {
