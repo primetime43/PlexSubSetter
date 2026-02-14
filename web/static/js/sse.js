@@ -16,17 +16,17 @@
 
         eventSource.addEventListener('progress', function(e) {
             const data = JSON.parse(e.data);
-            const appEl = document.querySelector('[x-data="appState()"]');
-            if (appEl && appEl.__x) {
-                appEl.__x.$data.handleProgress(data);
+            const appEl = document.querySelector('[x-data]');
+            if (appEl && appEl._x_dataStack) {
+                Alpine.$data(appEl).handleProgress(data);
             }
         });
 
         eventSource.addEventListener('task_complete', function(e) {
             const data = JSON.parse(e.data);
-            const appEl = document.querySelector('[x-data="appState()"]');
-            if (appEl && appEl.__x) {
-                appEl.__x.$data.handleTaskComplete(data);
+            const appEl = document.querySelector('[x-data]');
+            if (appEl && appEl._x_dataStack) {
+                Alpine.$data(appEl).handleTaskComplete(data);
             }
         });
 
@@ -42,9 +42,21 @@
 
         eventSource.addEventListener('subtitle_status', function(e) {
             const data = JSON.parse(e.data);
-            const appEl = document.querySelector('[x-data="appState()"]');
-            if (appEl && appEl.__x) {
-                appEl.__x.$data.handleSubtitleStatus(data);
+            const appEl = document.querySelector('[x-data]');
+            if (appEl && appEl._x_dataStack) {
+                Alpine.$data(appEl).handleSubtitleStatus(data);
+            }
+        });
+
+        eventSource.addEventListener('subtitle_cache_complete', function(e) {
+            const appEl = document.querySelector('[x-data]');
+            if (appEl && appEl._x_dataStack) {
+                const state = Alpine.$data(appEl);
+                // If a filter was waiting for the cache, apply it now
+                if (state.subFilter !== 'all' || state._cacheWaitingFilter) {
+                    state._cacheWaitingFilter = null;
+                    state._fetchItems();
+                }
             }
         });
 
@@ -57,7 +69,7 @@
     }
 
     // Only connect if we're on the app page (not login/servers)
-    if (document.querySelector('[x-data="appState()"]')) {
+    if (document.querySelector('[x-data]')) {
         connect();
     }
 })();

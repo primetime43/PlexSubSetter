@@ -22,6 +22,9 @@ def create_app():
     )
     app.secret_key = os.urandom(24)
 
+    # Disable static file caching during development
+    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
     # App-level globals (single-user local app)
     app.state = SessionState()
     app.task_manager = TaskManager()

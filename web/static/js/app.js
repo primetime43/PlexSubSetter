@@ -23,6 +23,7 @@ function appState() {
         subFilter: 'all',
         showSubFilter: false,
         filterStatus: '',
+        _cacheWaitingFilter: null,
 
         // Selection
         selectionCount: 0,
@@ -95,7 +96,8 @@ function appState() {
         },
 
         async _fetchItems() {
-            if (!currentLibrary) return;
+            if (!currentLibrary) { console.log('_fetchItems: no currentLibrary'); return; }
+            console.log('_fetchItems: fetching page', currentPage, 'library', currentLibrary);
             const params = new URLSearchParams({
                 page: currentPage,
                 search: this.searchText,
@@ -110,8 +112,12 @@ function appState() {
                 const html = await resp.text();
                 target.innerHTML = html;
 
-                // Detect if movie library (show sub filter)
-                this.showSubFilter = html.includes('item-checkbox') && !html.includes('show-checkbox');
+                // Detect if movie library (show sub filter) — only turn ON, never turn off from empty results
+                if (html.includes('item-checkbox') && !html.includes('show-checkbox')) {
+                    this.showSubFilter = true;
+                } else if (html.includes('show-checkbox')) {
+                    this.showSubFilter = false;
+                }
 
                 // Update selection count
                 this._syncSelectionCount();
@@ -318,7 +324,23 @@ function appState() {
         },
 
         handleSubtitleStatus(data) {
-            // Could update individual indicators without full refresh
+            // Update the subtitle indicator for this item in real-time
+            const key = data.rating_key;
+            const item = document.querySelector(`.browser-item[data-key="${key}"]`);
+            if (!item) return;
+
+            const indicator = item.querySelector('.sub-indicator');
+            if (indicator) {
+                if (data.has_subtitles) {
+                    indicator.className = 'sub-indicator text-green-500 font-bold text-xs';
+                    indicator.title = 'Has subtitles';
+                    indicator.innerHTML = '&#10003;';
+                } else {
+                    indicator.className = 'sub-indicator text-red-500 text-xs';
+                    indicator.title = 'No subtitles';
+                    indicator.innerHTML = '&#10007;';
+                }
+            }
         },
 
         _showInfoMessage(msg, type) {
@@ -352,9 +374,9 @@ window.toggleItem = async function(checkbox) {
         });
         const data = await resp.json();
         // Update Alpine state
-        const appEl = document.querySelector('[x-data="appState()"]');
-        if (appEl && appEl.__x) {
-            appEl.__x.$data.selectionCount = data.count;
+        const appEl = document.querySelector('[x-data]');
+        if (appEl && appEl._x_dataStack) {
+            Alpine.$data(appEl).selectionCount = data.count;
         }
     } catch (e) {
         console.error('Toggle item failed:', e);
@@ -422,9 +444,9 @@ window.toggleShowSelect = async function(checkbox, libraryName, ratingKey) {
             body: JSON.stringify({ keys: [key] })
         });
         const data = await resp.json();
-        const appEl = document.querySelector('[x-data="appState()"]');
-        if (appEl && appEl.__x) {
-            appEl.__x.$data.selectionCount = data.count;
+        const appEl = document.querySelector('[x-data]');
+        if (appEl && appEl._x_dataStack) {
+            Alpine.$data(appEl).selectionCount = data.count;
         }
     } catch (e) {
         console.error('Show select failed:', e);
@@ -441,9 +463,9 @@ window.toggleSeasonSelect = async function(checkbox, libraryName, ratingKey) {
             body: JSON.stringify({ keys: [key] })
         });
         const data = await resp.json();
-        const appEl = document.querySelector('[x-data="appState()"]');
-        if (appEl && appEl.__x) {
-            appEl.__x.$data.selectionCount = data.count;
+        const appEl = document.querySelector('[x-data]');
+        if (appEl && appEl._x_dataStack) {
+            Alpine.$data(appEl).selectionCount = data.count;
         }
     } catch (e) {
         console.error('Season select failed:', e);
@@ -451,10 +473,13 @@ window.toggleSeasonSelect = async function(checkbox, libraryName, ratingKey) {
 };
 
 window.changePage = function(page) {
+    console.log('changePage called with page:', page, 'currentLibrary:', currentLibrary);
     currentPage = page;
-    const appEl = document.querySelector('[x-data="appState()"]');
-    if (appEl && appEl.__x) {
-        appEl.__x.$data._fetchItems();
+    const appEl = document.querySelector('[x-data]');
+    if (appEl && appEl._x_dataStack) {
+        Alpine.$data(appEl)._fetchItems();
+    } else {
+        console.error('Could not find Alpine app state');
     }
 };
 

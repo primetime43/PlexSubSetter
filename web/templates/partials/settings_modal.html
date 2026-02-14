@@ -157,9 +157,9 @@ function settingsPanel() {
             });
             if (resp.ok) {
                 // Close modal via Alpine
-                const appEl = document.querySelector('[x-data="appState()"]');
-                if (appEl && appEl.__x) {
-                    appEl.__x.$data.showSettings = false;
+                const appEl = document.querySelector('[x-data]');
+                if (appEl) {
+                    Alpine.$data(appEl).showSettings = false;
                 }
             }
         },

@@ -46,13 +46,14 @@ def get_libraries(plex):
 
 def get_library_items(plex, library_name):
     """
-    Load all items from a library.
+    Load all items from a library, including subtitle stream data.
 
     Returns:
         tuple: (items_list, library_type)
     """
     library = plex.library.section(library_name)
-    items = library.all()
+    # Include stream data so subtitle checks don't need item.reload()
+    items = library.all(includeGuids=False)
     return items, library.type
 
 
@@ -154,6 +155,9 @@ def batch_check_subtitles(items, state, task_manager=None):
     """
     Check subtitle status for a batch of items, updating the cache.
 
+    First tries without reload (fast, uses already-loaded data).
+    Falls back to reload for items that don't have media data yet.
+
     Args:
         items: List of Plex items
         state: SessionState instance
@@ -161,38 +165,51 @@ def batch_check_subtitles(items, state, task_manager=None):
     """
     total = len(items)
     checked = 0
+    needs_reload = []
 
-    def check_one(item):
-        nonlocal checked
-        has_subs = check_subtitle_status(item, skip_reload=False)
-        state.cache_subtitle_status(item.ratingKey, has_subs)
-        checked += 1
-
-        if task_manager and checked % 50 == 0:
-            pct = int((checked / total) * 100)
-            task_manager.emit('progress', {
-                'type': 'subtitle_cache',
-                'current': checked,
-                'total': total,
-                'percent': pct,
-            })
-
-    futures = []
+    # Fast pass: check items that already have media data loaded
     for item in items:
-        # Skip if already cached
         if state.get_subtitle_status(item.ratingKey) is not None:
             checked += 1
             continue
-        futures.append(_thread_pool.submit(check_one, item))
 
-    # Wait for all to complete
-    for f in futures:
-        try:
-            f.result(timeout=120)
-        except Exception as e:
-            logging.debug(f"Error in batch subtitle check: {e}")
+        has_media = hasattr(item, 'media') and item.media
+        if has_media:
+            has_subs = check_subtitle_status(item, skip_reload=True)
+            state.cache_subtitle_status(item.ratingKey, has_subs)
+            checked += 1
+            if task_manager:
+                task_manager.emit('subtitle_status', {
+                    'rating_key': item.ratingKey,
+                    'has_subtitles': has_subs,
+                })
+        else:
+            needs_reload.append(item)
+
+    # Slow pass: reload items that need it (in parallel)
+    if needs_reload:
+        def check_one(item):
+            nonlocal checked
+            has_subs = check_subtitle_status(item, skip_reload=False)
+            state.cache_subtitle_status(item.ratingKey, has_subs)
+            checked += 1
+            if task_manager:
+                task_manager.emit('subtitle_status', {
+                    'rating_key': item.ratingKey,
+                    'has_subtitles': has_subs,
+                })
+
+        futures = [_thread_pool.submit(check_one, item) for item in needs_reload]
+        for f in futures:
+            try:
+                f.result(timeout=120)
+            except Exception as e:
+                logging.debug(f"Error in batch subtitle check: {e}")
 
     logging.info(f"Batch subtitle check complete: {checked}/{total}")
+
+    if task_manager:
+        task_manager.emit('subtitle_cache_complete', {'total': total})
 
 
 def get_item_title(item):

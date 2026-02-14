@@ -15,12 +15,12 @@
         </span>
         {% if item.ratingKey in subtitle_cache %}
             {% if subtitle_cache[item.ratingKey] %}
-            <span class="text-green-500 font-bold text-xs" title="Has subtitles">&#10003;</span>
+            <span class="sub-indicator text-green-500 font-bold text-xs" title="Has subtitles">&#10003;</span>
             {% else %}
-            <span class="text-red-500 text-xs" title="No subtitles">&#10007;</span>
+            <span class="sub-indicator text-red-500 text-xs" title="No subtitles">&#10007;</span>
             {% endif %}
         {% else %}
-        <span class="text-gray-600 text-xs">...</span>
+        <span class="sub-indicator text-gray-600 text-xs">...</span>
         {% endif %}
     </div>
     {% else %}
@@ -62,20 +62,23 @@
     {% endif %}
 </div>
 
-{% if search %}
+{% if not cache_complete and subtitle_filter != 'all' %}
 <script>
-    // Update filter status in Alpine
-    document.querySelector('[x-data]').__x.$data.filterStatus = 'Showing {{ filtered_count }}/{{ unfiltered_count }} matching "{{ search }}"';
+    Alpine.$data(document.querySelector('[x-data]')).filterStatus = 'Scanning subtitle status... filter will apply when complete.';
+    Alpine.$data(document.querySelector('[x-data]'))._cacheWaitingFilter = '{{ subtitle_filter }}';
+</script>
+{% elif search %}
+<script>
+    Alpine.$data(document.querySelector('[x-data]')).filterStatus = 'Showing {{ filtered_count }}/{{ unfiltered_count }} matching "{{ search }}"';
 </script>
 {% elif subtitle_filter != 'all' %}
 <script>
-    document.querySelector('[x-data]').__x.$data.filterStatus = 'Showing {{ filtered_count }}/{{ unfiltered_count }} {{ "without" if subtitle_filter == "missing" else "with" }} subtitles';
+    Alpine.$data(document.querySelector('[x-data]')).filterStatus = 'Showing {{ filtered_count }}/{{ unfiltered_count }} {{ "without" if subtitle_filter == "missing" else "with" }} subtitles';
 </script>
 {% else %}
 <script>
-    if (document.querySelector('[x-data]').__x) {
-        document.querySelector('[x-data]').__x.$data.filterStatus = '';
-    }
+    var el = document.querySelector('[x-data]');
+    if (el) { Alpine.$data(el).filterStatus = ''; }
 </script>
 {% endif %}
 

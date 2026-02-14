@@ -56,6 +56,7 @@ def library_items(name):
     page = request.args.get('page', 1, type=int)
     search = request.args.get('search', '')
     subtitle_filter = request.args.get('filter', 'all')
+    logging.info(f"Library items request: library={name}, page={page}, filter={subtitle_filter}, search={search}")
 
     # Load library items (use cache if available)
     if name not in state.library_items_cache:
@@ -76,14 +77,29 @@ def library_items(name):
     items = state.library_items_cache[name]
     is_movie = isinstance(items[0], Movie) if items else False
 
-    # Start background subtitle cache for movies
-    if is_movie and not state.subtitle_status_cache:
-        tm = current_app.task_manager
-        tm.submit('subtitle_cache', library_service.batch_check_subtitles,
-                  items=items, state=state, task_manager=tm)
+    # Start background subtitle cache for movies (only once)
+    cache = state.subtitle_status_cache  # direct dict ref, reads are thread-safe in CPython
+    if is_movie:
+        uncached = [i for i in items if i.ratingKey not in cache]
+        if uncached:
+            tm = current_app.task_manager
+            # Only submit if no subtitle_cache task is already running
+            running = any(
+                t['type'] == 'subtitle_cache' and t['status'] == 'running'
+                for t in tm._tasks.values()
+            )
+            if not running:
+                tm.submit('subtitle_cache', library_service.batch_check_subtitles,
+                          items=uncached, state=state, task_manager=tm)
+
+    # Check if cache is complete enough for filtering
+    cache_complete = all(i.ratingKey in cache for i in items) if is_movie else True
+
+    # If filter is active but cache isn't ready, fall back to 'all'
+    effective_filter = subtitle_filter if cache_complete else 'all'
 
     result = library_service.get_items_page(
-        items, page, ITEMS_PER_PAGE, search, subtitle_filter, state.subtitle_status_cache
+        items, page, ITEMS_PER_PAGE, search, effective_filter, state.subtitle_status_cache
     )
 
     selected_keys = state.get_selected_keys()
@@ -102,7 +118,8 @@ def library_items(name):
                            subtitle_filter=subtitle_filter,
                            subtitle_cache=state.subtitle_status_cache,
                            selected_keys=selected_keys,
-                           library_name=name)
+                           library_name=name,
+                           cache_complete=cache_complete)
 
 
 @libraries_bp.route('/libraries/<name>/shows/<int:rating_key>/seasons')
