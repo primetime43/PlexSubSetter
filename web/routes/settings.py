@@ -35,7 +35,6 @@ def update_settings():
     settings = {
         'subtitle_save_method': data.get('subtitle_save_method', 'plex'),
         'default_language': data.get('default_language', 'English'),
-        'appearance_mode': data.get('appearance_mode', 'dark'),
         'remember_last_library': data.get('remember_last_library', True),
         'last_library': data.get('last_library', ''),
         'prefer_hearing_impaired': data.get('prefer_hearing_impaired', False),
@@ -62,6 +61,27 @@ def update_settings():
         return jsonify({'status': 'ok'})
     except Exception as e:
         logging.error(f"Error saving settings: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@settings_bp.route('/settings/last-library', methods=['POST'])
+def save_last_library():
+    """Save the last selected library name."""
+    config = ConfigManager()
+    name = request.json.get('name', '')
+
+    # Read existing config and update only last_library
+    config.config.read(config.config_path)
+    if not config.config.has_section('General'):
+        config.config.add_section('General')
+    config.config.set('General', 'last_library', name)
+
+    try:
+        with open(config.config_path, 'w') as f:
+            config.config.write(f)
+        return jsonify({'status': 'ok'})
+    except (IOError, OSError) as e:
+        logging.error(f"Error saving last library: {e}")
         return jsonify({'error': str(e)}), 500
 
 

@@ -7,6 +7,7 @@ Extracted from ui/subtitle_operations.py. No UI dependencies.
 import os
 import tempfile
 import logging
+import concurrent.futures
 
 from plexapi.video import Movie, Episode
 from subliminal import download_subtitles, list_subtitles
@@ -48,7 +49,7 @@ def _make_video_object(item):
     return video
 
 
-def search(items, language_name, providers, task_manager=None, timeout=None):
+def search(items, language_name, providers, task_manager=None, timeout=None, sdh=False, forced=False):
     """
     Search for available subtitles.
 
@@ -58,6 +59,8 @@ def search(items, language_name, providers, task_manager=None, timeout=None):
         providers: Comma-separated provider string
         task_manager: Optional TaskManager for progress events
         timeout: Optional search timeout in seconds per provider
+        sdh: If True, prefer hearing-impaired subtitles (sort to top)
+        forced: If True, prefer forced subtitles (sort to top)
 
     Returns:
         dict: {rating_key: {title, subtitles: [{provider, release_info, index}]}}
@@ -96,6 +99,17 @@ def search(items, language_name, providers, task_manager=None, timeout=None):
                 kwargs['provider_configs'] = provider_configs
             subtitles = list_subtitles({video}, languages={lang}, **kwargs)
             subs_list = list(subtitles.get(video, []))
+
+            # Preference sort: SDH/forced subs come first if requested
+            if subs_list and (sdh or forced):
+                def _sort_key(sub):
+                    score = 0
+                    if sdh and getattr(sub, 'hearing_impaired', False):
+                        score -= 1
+                    if forced and getattr(sub, 'forced', False):
+                        score -= 1
+                    return score
+                subs_list.sort(key=_sort_key)
 
             if subs_list:
                 results[item.ratingKey] = {
@@ -140,7 +154,7 @@ def search(items, language_name, providers, task_manager=None, timeout=None):
     return results
 
 
-def download(items, search_results, selections, language_name, save_method, task_manager=None):
+def download(items, search_results, selections, language_name, save_method, task_manager=None, concurrent_downloads=1):
     """
     Download selected subtitles.
 
@@ -151,15 +165,17 @@ def download(items, search_results, selections, language_name, save_method, task
         language_name: Language name
         save_method: 'plex' or 'file'
         task_manager: Optional TaskManager
+        concurrent_downloads: Number of parallel download workers
 
     Returns:
         dict: {success_count, total_count, successful_keys}
     """
     language_code = SEARCH_LANGUAGES.get(language_name, 'en')
-    success_count = 0
     successful_keys = []
     total_count = len(selections)
 
+    # Build list of download tasks (skip entries with index -1 or missing data)
+    download_tasks = []
     for rating_key, selected_index in selections.items():
         if selected_index == -1:
             if task_manager:
@@ -171,22 +187,16 @@ def download(items, search_results, selections, language_name, save_method, task
         if not result_data:
             continue
 
-        item = result_data['item']
         subs_list = result_data.get('subtitles_raw', [])
-        title = result_data['title']
-
         if selected_index >= len(subs_list):
             continue
 
-        selected_sub = subs_list[selected_index]
+        download_tasks.append((rating_key, result_data, subs_list[selected_index]))
 
-        if task_manager:
-            task_manager.emit('progress', {
-                'type': 'download',
-                'current': success_count + 1,
-                'total': total_count,
-                'item': title,
-            })
+    def _download_one(task_info):
+        rating_key, result_data, selected_sub = task_info
+        item = result_data['item']
+        title = result_data['title']
 
         try:
             provider = getattr(selected_sub, 'provider_name', 'unknown')
@@ -201,7 +211,7 @@ def download(items, search_results, selections, language_name, save_method, task
             except ValueError as e:
                 if task_manager:
                     task_manager.emit('log', {'message': f"Error: {e}", 'level': 'error'})
-                continue
+                return None
 
             try:
                 with open(subtitle_path, 'wb') as f:
@@ -212,13 +222,10 @@ def download(items, search_results, selections, language_name, save_method, task
                 else:
                     item.uploadSubtitles(subtitle_path)
 
-                success_count += 1
-                successful_keys.append(rating_key)
-
                 if task_manager:
                     task_manager.emit('log', {'message': f"Successfully downloaded subtitle for: {title}"})
+                return rating_key
             finally:
-                # Always clean up temp file
                 try:
                     os.remove(subtitle_path)
                 except (OSError, PermissionError) as cleanup_error:
@@ -228,6 +235,27 @@ def download(items, search_results, selections, language_name, save_method, task
             logging.error(f"Error downloading subtitle for {title}: {e}")
             if task_manager:
                 task_manager.emit('log', {'message': f"Error downloading for {title}: {e}", 'level': 'error'})
+            return None
+
+    # Execute downloads with thread pool
+    completed = 0
+    max_workers = max(1, min(concurrent_downloads, len(download_tasks) or 1))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(_download_one, task): task for task in download_tasks}
+        for future in concurrent.futures.as_completed(futures):
+            completed += 1
+            task_info = futures[future]
+            title = task_info[1]['title']
+            if task_manager:
+                task_manager.emit('progress', {
+                    'type': 'download',
+                    'current': completed,
+                    'total': total_count,
+                    'item': title,
+                })
+            result_key = future.result()
+            if result_key is not None:
+                successful_keys.append(result_key)
 
     # Reload successful items
     for rk in successful_keys:
@@ -239,7 +267,7 @@ def download(items, search_results, selections, language_name, save_method, task
                 pass
 
     return {
-        'success_count': success_count,
+        'success_count': len(successful_keys),
         'total_count': total_count,
         'successful_keys': successful_keys,
     }
@@ -281,9 +309,13 @@ def _save_to_file(item, subtitle_path, language_code, task_manager=None):
         item.uploadSubtitles(subtitle_path)
 
 
-def dry_run(items, language_name, providers, task_manager=None, timeout=None):
+def dry_run(items, language_name, providers, task_manager=None, timeout=None, sdh=False, forced=False):
     """
     Preview subtitle availability without downloading.
+
+    Args:
+        sdh: Accepted for API consistency (not used in dry run)
+        forced: Accepted for API consistency (not used in dry run)
 
     Returns:
         dict with keys: already_have, available, not_available, errors

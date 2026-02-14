@@ -140,7 +140,6 @@ function settingsPanel() {
         tab: 'general',
         s: {
             default_language: '{{ settings.default_language }}',
-            appearance_mode: '{{ settings.appearance_mode }}',
             remember_last_library: {{ 'true' if settings.remember_last_library else 'false' }},
             subtitle_save_method: '{{ settings.subtitle_save_method }}',
             prefer_hearing_impaired: {{ 'true' if settings.prefer_hearing_impaired else 'false' }},

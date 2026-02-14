@@ -20,7 +20,7 @@ function appState() {
 
         // Library browser state
         searchText: '',
-        subFilter: 'all',
+        subFilter: (window.APP_SETTINGS && APP_SETTINGS.default_subtitle_filter) || 'all',
         showSubFilter: false,
         filterStatus: '',
         _cacheWaitingFilter: null,
@@ -28,11 +28,11 @@ function appState() {
         // Selection
         selectionCount: 0,
 
-        // Options
+        // Options (initialized from saved settings)
         language: 'English',
         provider: 'opensubtitles',
-        sdh: false,
-        forced: false,
+        sdh: window.APP_SETTINGS ? APP_SETTINGS.prefer_hearing_impaired : false,
+        forced: window.APP_SETTINGS ? APP_SETTINGS.prefer_forced : false,
 
         // Operation state
         operationRunning: false,
@@ -45,8 +45,22 @@ function appState() {
         _logLoaded: false,
 
         init() {
-            // Load libraries on init
-            this.loadLibraries();
+            // Show log panel on startup if configured
+            if (window.APP_SETTINGS && APP_SETTINGS.show_log_on_startup) {
+                this.showLogs = true;
+            }
+
+            // Load libraries on init (and auto-select last library if configured)
+            this.loadLibraries().then(() => {
+                if (window.APP_SETTINGS && APP_SETTINGS.remember_last_library && APP_SETTINGS.last_library) {
+                    const select = document.getElementById('library-select');
+                    const option = Array.from(select.options).find(o => o.value === APP_SETTINGS.last_library);
+                    if (option) {
+                        select.value = APP_SETTINGS.last_library;
+                        this.loadLibrary(APP_SETTINGS.last_library);
+                    }
+                }
+            });
 
             // Auto-refresh logs while panel is open
             this.$watch('showLogs', (open) => {
@@ -118,12 +132,21 @@ function appState() {
             currentLibrary = name;
             currentPage = 1;
             this.searchText = '';
-            this.subFilter = 'all';
+            this.subFilter = (window.APP_SETTINGS && APP_SETTINGS.default_subtitle_filter) || 'all';
             this.showSubFilter = false;
             this.selectionCount = 0;
             this.hasSearchResults = false;
             subSelections = {};
             this._fetchItems();
+
+            // Save as last library if remember is enabled
+            if (window.APP_SETTINGS && APP_SETTINGS.remember_last_library) {
+                fetch('/settings/last-library', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name })
+                }).catch(() => {});
+            }
         },
 
         reloadLibrary() {
@@ -206,7 +229,16 @@ function appState() {
             }
         },
 
+        _confirmBatch(action) {
+            if (!window.APP_SETTINGS) return true;
+            if (APP_SETTINGS.confirm_batch_operations && this.selectionCount >= APP_SETTINGS.batch_operation_threshold) {
+                return confirm(`You are about to ${action} on ${this.selectionCount} items. Continue?`);
+            }
+            return true;
+        },
+
         async searchSubtitles() {
+            if (!this._confirmBatch('search')) return;
             this.operationRunning = true;
             this.progressPercent = 0;
             this.progressText = 'Searching for subtitles...';
@@ -256,6 +288,7 @@ function appState() {
         },
 
         async dryRun() {
+            if (!this._confirmBatch('dry run')) return;
             this.operationRunning = true;
             this.progressPercent = 0;
             this.progressText = 'Running dry run...';
@@ -290,7 +323,8 @@ function appState() {
         },
 
         async deleteSubtitles() {
-            if (!confirm('Delete ALL subtitle streams from selected items?\n\nThis cannot be undone!')) return;
+            // Always confirm deletes regardless of threshold
+            if (!confirm(`Delete ALL subtitle streams from ${this.selectionCount} selected items?\n\nThis cannot be undone!`)) return;
 
             this.operationRunning = true;
             this.progressPercent = 0;
@@ -317,6 +351,7 @@ function appState() {
         },
 
         async downloadSubtitles() {
+            if (!this._confirmBatch('download')) return;
             this.operationRunning = true;
             this.progressPercent = 0;
             this.progressText = 'Downloading subtitles...';

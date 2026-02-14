@@ -24,11 +24,13 @@ def search_subtitles():
     language = request.json.get('language', settings.get('default_language', 'English'))
     providers = request.json.get('providers', settings.get('default_providers', 'opensubtitles,podnapisi'))
     timeout = settings.get('search_timeout', 30)
+    sdh = request.json.get('sdh', False)
+    forced = request.json.get('forced', False)
 
     items = list(state.selected_items)
 
     def do_search():
-        results = subtitle_service.search(items, language, providers, tm, timeout=timeout)
+        results = subtitle_service.search(items, language, providers, tm, timeout=timeout, sdh=sdh, forced=forced)
         # Store results in state for download
         state.search_results = results
         return results
@@ -77,12 +79,14 @@ def download_subtitles():
 
     language = request.json.get('language', settings.get('default_language', 'English'))
     save_method = request.json.get('save_method', settings.get('subtitle_save_method', 'plex'))
+    concurrent_downloads = settings.get('concurrent_downloads', 3)
 
     search_results = state.search_results
 
     def do_download():
         result = subtitle_service.download(
-            state.selected_items, search_results, selections, language, save_method, tm
+            state.selected_items, search_results, selections, language, save_method, tm,
+            concurrent_downloads=concurrent_downloads
         )
         # Clear subtitle cache for successful items
         if result['successful_keys']:
@@ -110,11 +114,13 @@ def dry_run():
     language = request.json.get('language', settings.get('default_language', 'English'))
     providers = request.json.get('providers', settings.get('default_providers', 'opensubtitles,podnapisi'))
     timeout = settings.get('search_timeout', 30)
+    sdh = request.json.get('sdh', False)
+    forced = request.json.get('forced', False)
 
     items = list(state.selected_items)
 
     def do_dry_run():
-        return subtitle_service.dry_run(items, language, providers, tm, timeout=timeout)
+        return subtitle_service.dry_run(items, language, providers, tm, timeout=timeout, sdh=sdh, forced=forced)
 
     task_id = tm.submit('dry_run', do_dry_run)
     return jsonify({'task_id': task_id, 'item_count': len(items)})

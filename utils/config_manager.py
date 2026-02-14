@@ -24,7 +24,6 @@ class ConfigManager:
         'General': {
             'subtitle_save_method': 'plex',
             'default_language': 'English',
-            'appearance_mode': 'dark',
             'remember_last_library': True,
             'last_library': ''
         },
@@ -75,10 +74,6 @@ class ConfigManager:
         settings['default_language'] = self.config.get(
             'General', 'default_language',
             fallback=self.DEFAULTS['General']['default_language']
-        )
-        settings['appearance_mode'] = self.config.get(
-            'General', 'appearance_mode',
-            fallback=self.DEFAULTS['General']['appearance_mode']
         )
         settings['remember_last_library'] = self.config.getboolean(
             'General', 'remember_last_library',
@@ -153,7 +148,6 @@ class ConfigManager:
             self.config.add_section('General')
         self.config.set('General', 'subtitle_save_method', settings['subtitle_save_method'])
         self.config.set('General', 'default_language', settings['default_language'])
-        self.config.set('General', 'appearance_mode', settings['appearance_mode'])
         self.config.set('General', 'remember_last_library', str(settings['remember_last_library']))
         self.config.set('General', 'last_library', settings.get('last_library', ''))
 

@@ -194,3 +194,18 @@
     </div>
 </div>
 {% endblock %}
+
+{% block scripts %}
+<script>
+    window.APP_SETTINGS = {
+        remember_last_library: {{ 'true' if settings.remember_last_library else 'false' }},
+        last_library: {{ settings.last_library | tojson }},
+        default_subtitle_filter: {{ settings.default_subtitle_filter | tojson }},
+        show_log_on_startup: {{ 'true' if settings.show_log_on_startup else 'false' }},
+        prefer_hearing_impaired: {{ 'true' if settings.prefer_hearing_impaired else 'false' }},
+        prefer_forced: {{ 'true' if settings.prefer_forced else 'false' }},
+        confirm_batch_operations: {{ 'true' if settings.confirm_batch_operations else 'false' }},
+        batch_operation_threshold: {{ settings.batch_operation_threshold }},
+    };
+</script>
+{% endblock %}
