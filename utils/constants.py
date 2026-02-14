@@ -53,6 +53,7 @@ CRITICAL_RETRY_ATTEMPTS = 3  # Retry attempts for critical operations (server co
 DEFAULT_RETRY_DELAY = 2.0  # Initial delay between retries in seconds
 CRITICAL_RETRY_DELAY = 1.0  # Initial delay for critical operations
 
-# Configuration File
-CONFIG_FILE_PATH = 'config.ini'  # Path to application configuration file
+# Configuration File — resolve to project root (same directory as run.bat / app.py)
+import os as _os
+CONFIG_FILE_PATH = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), 'config.ini')
 
