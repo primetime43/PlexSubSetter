@@ -128,10 +128,27 @@ def download_subtitles():
             state.clear_subtitle_cache(result['successful_keys'])
             # Clear search results after successful download
             state.search_results = {}
+        # Store download results for summary display
+        state.last_download_result = result
         return result
 
     task_id = tm.submit('subtitle_download', do_download)
     return jsonify({'task_id': task_id})
+
+
+@subtitles_bp.route('/subtitles/download-results')
+def download_results():
+    """Get download results as HTML partial."""
+    state = current_app.state
+    result = getattr(state, 'last_download_result', None)
+
+    if not result:
+        return '<div class="text-gray-400 p-4 text-center">No download results available.</div>'
+
+    return render_template('partials/download_results.html',
+                           succeeded=result.get('succeeded', []),
+                           failed=result.get('failed', []),
+                           skipped=result.get('skipped', []))
 
 
 @subtitles_bp.route('/subtitles/dry-run', methods=['POST'])

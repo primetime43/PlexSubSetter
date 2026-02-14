@@ -221,6 +221,16 @@ def download(items, search_results, selections, language_name, save_method, task
 
         download_tasks.append((rating_key, result_data, subs_list[selected_index]))
 
+    skipped_items = []
+    failed_items = []
+    succeeded_items = []
+
+    # Track skipped items
+    for rating_key, selected_index in selections.items():
+        if selected_index == -1:
+            result_data = search_results.get(rating_key, {})
+            skipped_items.append(result_data.get('title', str(rating_key)))
+
     logging.info(f"Download: {len(selections)} selections, {len(download_tasks)} tasks to download")
 
     if download_tasks:
@@ -253,6 +263,7 @@ def download(items, search_results, selections, language_name, save_method, task
                 if not getattr(selected_sub, 'content', None):
                     if task_manager:
                         task_manager.emit('log', {'message': f"No content downloaded for: {title}", 'level': 'warning'})
+                    failed_items.append({'title': title, 'error': 'No content downloaded'})
                     continue
 
                 validate_subtitle_content_size(selected_sub.content)
@@ -270,9 +281,11 @@ def download(items, search_results, selections, language_name, save_method, task
                     else:
                         item.uploadSubtitles(subtitle_path)
 
+                    provider = getattr(selected_sub, 'provider_name', 'unknown')
                     if task_manager:
                         task_manager.emit('log', {'message': f"Successfully downloaded subtitle for: {title}"})
                     successful_keys.append(rating_key)
+                    succeeded_items.append({'title': title, 'provider': provider})
                 finally:
                     try:
                         os.remove(subtitle_path)
@@ -281,6 +294,7 @@ def download(items, search_results, selections, language_name, save_method, task
 
             except Exception as e:
                 logging.error(f"Error saving subtitle for {title}: {e}")
+                failed_items.append({'title': title, 'error': str(e)})
                 if task_manager:
                     task_manager.emit('log', {'message': f"Error saving for {title}: {e}", 'level': 'error'})
 
@@ -297,6 +311,9 @@ def download(items, search_results, selections, language_name, save_method, task
         'success_count': len(successful_keys),
         'total_count': total_count,
         'successful_keys': successful_keys,
+        'succeeded': succeeded_items,
+        'failed': failed_items,
+        'skipped': skipped_items,
     }
 
 

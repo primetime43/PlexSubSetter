@@ -1,0 +1,68 @@
+<div class="space-y-4">
+    <div class="flex items-center gap-3">
+        {% if failed|length == 0 %}
+        <span class="text-green-400 text-lg">&#10003;</span>
+        <h3 class="text-lg font-bold text-green-400">Download Complete</h3>
+        {% else %}
+        <span class="text-yellow-400 text-lg">&#9888;</span>
+        <h3 class="text-lg font-bold text-yellow-400">Download Finished with Errors</h3>
+        {% endif %}
+    </div>
+
+    <p class="text-sm text-gray-400">
+        <span class="text-white font-bold">{{ succeeded|length }}</span> downloaded,
+        {% if failed|length > 0 %}
+        <span class="text-red-400 font-bold">{{ failed|length }}</span> failed,
+        {% endif %}
+        {% if skipped|length > 0 %}
+        <span class="text-gray-500">{{ skipped|length }}</span> skipped
+        {% endif %}
+    </p>
+
+    {% if succeeded %}
+    <div class="bg-gray-800 rounded-lg overflow-hidden">
+        <div class="px-4 py-2 bg-gray-700">
+            <span class="font-bold text-sm text-green-400">Successful ({{ succeeded|length }})</span>
+        </div>
+        <div class="px-4 py-1 divide-y divide-gray-700">
+            {% for item in succeeded %}
+            <div class="flex items-center justify-between py-1.5">
+                <span class="text-sm text-gray-300">{{ item.title }}</span>
+                <span class="text-xs text-gray-500">{{ item.provider }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if failed %}
+    <div class="bg-gray-800 rounded-lg overflow-hidden">
+        <div class="px-4 py-2 bg-gray-700">
+            <span class="font-bold text-sm text-red-400">Failed ({{ failed|length }})</span>
+        </div>
+        <div class="px-4 py-1 divide-y divide-gray-700">
+            {% for item in failed %}
+            <div class="flex items-center justify-between py-1.5">
+                <span class="text-sm text-gray-300">{{ item.title }}</span>
+                <span class="text-xs text-red-400">{{ item.error }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if skipped %}
+    <div class="bg-gray-800 rounded-lg overflow-hidden">
+        <div class="px-4 py-2 bg-gray-700">
+            <span class="font-bold text-sm text-gray-500">Skipped ({{ skipped|length }})</span>
+        </div>
+        <div class="px-4 py-1 divide-y divide-gray-700">
+            {% for title in skipped %}
+            <div class="py-1.5">
+                <span class="text-sm text-gray-500">{{ title }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>

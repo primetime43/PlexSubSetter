@@ -444,10 +444,18 @@ function appState() {
             } else if (data.task_type === 'subtitle_download') {
                 this.hasSearchResults = false;
                 subSelections = {};
-                this._showInfoMessage(
-                    data.success ? 'Download complete!' : `Download failed: ${data.error || 'Unknown error'}`,
-                    data.success ? 'success' : 'error'
-                );
+                if (data.success) {
+                    // Fetch and show download summary
+                    try {
+                        const resp = await fetch('/subtitles/download-results');
+                        const html = await resp.text();
+                        document.getElementById('info-panel').innerHTML = html;
+                    } catch (e) {
+                        this._showInfoMessage('Download complete!', 'success');
+                    }
+                } else {
+                    this._showInfoMessage(`Download failed: ${data.error || 'Unknown error'}`, 'error');
+                }
                 // Refresh browser items and expanded seasons to update subtitle indicators
                 this._fetchItems();
                 this._refreshExpandedSeasons();
