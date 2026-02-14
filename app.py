@@ -49,6 +49,9 @@ def main():
 
     threading.Thread(target=open_browser, daemon=True).start()
 
+    # Suppress Flask dev server warning (this is a local single-user app)
+    logging.getLogger('werkzeug').setLevel(logging.ERROR)
+
     logging.info(f"Starting PlexSubSetter web server on {url}")
     app.run(host='127.0.0.1', port=port, debug=False, threaded=True)
 
