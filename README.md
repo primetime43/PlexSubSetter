@@ -11,11 +11,8 @@ Stop going episode by episode to set subtitles in Plex! PlexSubSetter lets you s
 - [What It Does](#what-it-does)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
-- [Configuration](#configuration)
 - [How to Use](#how-to-use)
-- [Architecture](#architecture)
 - [Troubleshooting](#troubleshooting)
-- [License](#license)
 
 ## Why I Built This
 
@@ -80,58 +77,6 @@ python3 app.py
 
 The app starts a local web server on `http://localhost:5000` and opens your browser automatically.
 
-## Configuration
-
-PlexSubSetter stores all your settings in a `config.ini` file in the application directory. You can change settings two ways:
-
-1. **Through the web UI** - Click the Settings button (easy, recommended)
-2. **Edit config.ini directly** - For advanced users or automation
-
-All settings are saved automatically and persist between sessions. No need to reconfigure every time you open the app!
-
-### Settings Options
-
-#### General
-```ini
-[General]
-subtitle_save_method = plex        # "plex" or "file"
-default_language = English         # Default subtitle language
-remember_last_library = True       # Remember last selected library
-last_library =                     # Auto-populated
-```
-
-#### Subtitles
-```ini
-[Subtitles]
-prefer_hearing_impaired = False    # Prefer SDH subtitles
-prefer_forced = False              # Prefer forced subtitles
-default_providers = opensubtitles,podnapisi  # Comma-separated providers
-search_timeout = 30                # Search timeout in seconds
-```
-
-#### UI/Behavior
-```ini
-[UI]
-default_subtitle_filter = all      # "all", "missing", or "has"
-confirm_batch_operations = True    # Confirm large batch operations
-batch_operation_threshold = 10     # Items count for confirmation
-```
-
-#### Advanced
-```ini
-[Advanced]
-concurrent_downloads = 3           # Parallel download limit
-enable_debug_logging = False       # Enable debug logging
-```
-
-### How Subtitles Are Stored
-
-You can choose how PlexSubSetter saves downloaded subtitles:
-
-- **plex** (default): Subtitles are stored in Plex's database. Requires Plex Pass and subtitle agents to be enabled in Plex settings. This keeps subtitles attached to the media item in Plex.
-
-- **file**: Subtitles are saved as separate .srt files next to your video files (e.g., `Movie.mkv` + `Movie.en.srt`). Works without Plex Pass but requires the app to have access to your media file locations.
-
 ## How to Use
 
 ### First Time Setup
@@ -156,6 +101,14 @@ You can choose how PlexSubSetter saves downloaded subtitles:
 
 **Quick search:** Type in the search box at the top to filter by title
 
+### How Subtitles Are Stored
+
+You can choose how PlexSubSetter saves downloaded subtitles:
+
+- **plex** (default): Subtitles are stored in Plex's database. Requires Plex Pass and subtitle agents to be enabled in Plex settings. This keeps subtitles attached to the media item in Plex.
+
+- **file**: Subtitles are saved as separate .srt files next to your video files (e.g., `Movie.mkv` + `Movie.en.srt`). Works without Plex Pass but requires the app to have access to your media file locations.
+
 ### Other Useful Features
 
 - **List Current** - See what subtitle streams are already on selected items
@@ -164,56 +117,6 @@ You can choose how PlexSubSetter saves downloaded subtitles:
 - **Settings** - Change language, providers, and other options
 - **All/Missing/Has Subs buttons** - Quickly filter your library by subtitle status
 - **Reload Library** - Refresh the view after making changes in Plex
-
-## Architecture
-
-PlexSubSetter uses a web-based architecture with Flask backend and htmx + Alpine.js frontend:
-
-```
-PlexSubSetter/
-├── app.py                         # Flask entry point
-├── plex_subsetter.py              # CLI entry point
-├── core/                          # Business logic (no UI)
-│   ├── session_state.py           # In-memory session state
-│   ├── task_manager.py            # Background tasks + SSE
-│   ├── auth_service.py            # Plex OAuth
-│   ├── server_service.py          # Server discovery/connection
-│   ├── library_service.py         # Library browsing
-│   └── subtitle_service.py        # Subtitle operations
-├── web/                           # Flask web application
-│   ├── __init__.py                # App factory
-│   ├── routes/                    # Route blueprints
-│   │   ├── auth.py                # Authentication routes
-│   │   ├── servers.py             # Server selection
-│   │   ├── libraries.py           # Library browsing
-│   │   ├── subtitles.py           # Subtitle operations
-│   │   ├── settings.py            # Settings management
-│   │   ├── events.py              # SSE endpoint
-│   │   └── logs.py                # Log viewer
-│   ├── templates/                 # Jinja2 templates
-│   │   ├── base.html              # Base layout
-│   │   ├── login.html             # Login page
-│   │   ├── servers.html           # Server selection
-│   │   ├── app.html               # Main app (two-column)
-│   │   └── partials/              # htmx partial templates
-│   └── static/                    # CSS and JavaScript
-├── utils/                         # Utility modules
-│   ├── config_manager.py          # Configuration management
-│   ├── constants.py               # Shared constants
-│   ├── logging_config.py          # Logging setup
-│   └── security.py                # Security utilities
-├── error_handling.py              # Error handling & logging
-└── config.ini                     # User configuration
-```
-
-### Key Design Patterns
-- **Service Layer**: All business logic in `core/` with no UI dependencies
-- **SSE (Server-Sent Events)**: Real-time progress updates from background tasks
-- **htmx**: Server-rendered HTML partials for dynamic content
-- **Alpine.js**: Lightweight reactive state for UI interactions
-- **Background Tasks**: Long operations run in threads, push events via SSE
-- **Lazy Loading**: Shows/seasons expand on demand for performance
-- **Caching**: Subtitle status cached to prevent redundant API calls
 
 ## Troubleshooting
 
@@ -239,7 +142,3 @@ PlexSubSetter/
 - Click "Reload Library" to refresh
 - Check that items have been reloaded from server
 - Verify subtitle streams are actually present in Plex
-
-## License
-
-This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
