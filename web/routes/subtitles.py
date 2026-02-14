@@ -1,7 +1,10 @@
 """Subtitle operation routes."""
 
 import logging
+from collections import OrderedDict
 from flask import Blueprint, render_template, jsonify, request, current_app
+
+from plexapi.video import Episode
 
 from core import subtitle_service
 from utils.config_manager import ConfigManager
@@ -48,17 +51,49 @@ def search_results():
     if not results:
         return '<div class="text-gray-400 p-4 text-center">No search results. Run a search first.</div>'
 
-    # Convert to template-friendly format
-    items = []
+    # Group results by type: movies vs shows (grouped by show/season)
+    movies = []
+    shows_dict = {}  # {show_name: {season_num: [episodes...]}}
+    total_searched = len(state.selected_items) if state.selected_items else len(results)
+    found_count = len(results)
+
     for rk, data in results.items():
-        items.append({
+        item = data.get('item')
+        entry = {
             'rating_key': rk,
-            'title': data['title'],
             'subtitles': data.get('subtitles', []),
             'total_count': len(data.get('subtitles_raw', [])),
-        })
+        }
 
-    return render_template('partials/search_results.html', items=items)
+        if isinstance(item, Episode):
+            show_name = item.grandparentTitle or 'Unknown Show'
+            season_num = item.seasonNumber if item.seasonNumber is not None else 0
+            ep_num = item.index if item.index is not None else 0
+            entry['episode_title'] = f"E{ep_num:02d} - {item.title}"
+            entry['episode_index'] = ep_num
+
+            if show_name not in shows_dict:
+                shows_dict[show_name] = {}
+            if season_num not in shows_dict[show_name]:
+                shows_dict[show_name][season_num] = []
+            shows_dict[show_name][season_num].append(entry)
+        else:
+            entry['title'] = data['title']
+            movies.append(entry)
+
+    # Sort shows by name, seasons by number, episodes by index
+    shows = OrderedDict()
+    for show_name in sorted(shows_dict.keys()):
+        shows[show_name] = OrderedDict()
+        for season_num in sorted(shows_dict[show_name].keys()):
+            episodes = shows_dict[show_name][season_num]
+            episodes.sort(key=lambda e: e['episode_index'])
+            shows[show_name][season_num] = episodes
+
+    return render_template('partials/search_results.html',
+                           movies=movies, shows=shows,
+                           found_count=found_count,
+                           total_searched=total_searched)
 
 
 @subtitles_bp.route('/subtitles/download', methods=['POST'])
@@ -190,4 +225,8 @@ def task_status(task_id):
     task = tm.get_task(task_id)
     if not task:
         return jsonify({'error': 'Task not found'}), 404
-    return jsonify(task)
+    return jsonify({
+        'status': task.get('status'),
+        'type': task.get('type'),
+        'error': task.get('error'),
+    })

@@ -200,6 +200,21 @@ function appState() {
             }
         },
 
+        _refreshExpandedSeasons() {
+            // Re-fetch all currently expanded season episode panels to update subtitle indicators
+            document.querySelectorAll('.expand-btn[data-expanded="true"]').forEach(btn => {
+                const seasonDiv = btn.closest('[data-season-key]');
+                if (!seasonDiv) return;
+                const ratingKey = seasonDiv.dataset.seasonKey;
+                const container = seasonDiv.querySelector('.episodes-container');
+                if (!container || !currentLibrary) return;
+                fetch(`/libraries/${encodeURIComponent(currentLibrary)}/seasons/${ratingKey}/episodes`)
+                    .then(resp => resp.text())
+                    .then(html => { container.innerHTML = html; })
+                    .catch(() => {});
+            });
+        },
+
         async selectAll() {
             if (!currentLibrary) return;
             try {
@@ -268,7 +283,8 @@ function appState() {
                 if (data.error) {
                     this._showInfoMessage(data.error, 'error');
                 }
-                // Results will arrive via SSE task_complete
+                // Results will arrive via SSE task_complete, with polling fallback
+                if (data.task_id) this._pollTaskStatus(data.task_id);
             } catch (e) {
                 this.operationRunning = false;
                 this._showInfoMessage('Search failed: ' + e.message, 'error');
@@ -318,7 +334,8 @@ function appState() {
                     this._showInfoMessage(data.error, 'error');
                     this.operationRunning = false;
                 }
-                // Results via SSE task_complete
+                // Results via SSE task_complete, with polling fallback
+                if (data.task_id) this._pollTaskStatus(data.task_id);
             } catch (e) {
                 this.operationRunning = false;
                 this._showInfoMessage('Dry run failed: ' + e.message, 'error');
@@ -346,7 +363,8 @@ function appState() {
                     this._showInfoMessage(data.error, 'error');
                     this.operationRunning = false;
                 }
-                // Results via SSE task_complete
+                // Results via SSE task_complete, with polling fallback
+                if (data.task_id) this._pollTaskStatus(data.task_id);
             } catch (e) {
                 this.operationRunning = false;
                 this._showInfoMessage('Delete failed: ' + e.message, 'error');
@@ -379,7 +397,8 @@ function appState() {
                     this._showInfoMessage(data.error, 'error');
                     this.operationRunning = false;
                 }
-                // Results via SSE task_complete
+                // Results via SSE task_complete, with polling fallback
+                if (data.task_id) this._pollTaskStatus(data.task_id);
             } catch (e) {
                 this.operationRunning = false;
                 this._showInfoMessage('Download failed: ' + e.message, 'error');
@@ -405,6 +424,12 @@ function appState() {
                     const html = await resp.text();
                     document.getElementById('info-panel').innerHTML = html;
                     this.hasSearchResults = data.success;
+                    // Auto-select best subtitle (index 0) for all items
+                    document.querySelectorAll('[data-sub-select]').forEach(sel => {
+                        const rk = parseInt(sel.dataset.subSelect);
+                        const val = parseInt(sel.value);
+                        window.setSubSelection(rk, val);
+                    });
                 } catch (e) {
                     console.error('Failed to load search results:', e);
                 }
@@ -423,18 +448,51 @@ function appState() {
                     data.success ? 'Download complete!' : `Download failed: ${data.error || 'Unknown error'}`,
                     data.success ? 'success' : 'error'
                 );
-                // Refresh browser items to update subtitle indicators
+                // Refresh browser items and expanded seasons to update subtitle indicators
                 this._fetchItems();
+                this._refreshExpandedSeasons();
             } else if (data.task_type === 'subtitle_delete') {
                 this._showInfoMessage(
                     data.success ? 'Subtitles deleted successfully.' : `Delete failed: ${data.error || 'Unknown error'}`,
                     data.success ? 'success' : 'error'
                 );
                 this._fetchItems();
+                this._refreshExpandedSeasons();
             } else if (data.task_type === 'select_all') {
                 this._syncSelectionCount();
                 this._fetchItems();
             }
+        },
+
+        _pollTaskStatus(taskId) {
+            // Polling fallback in case SSE misses the task_complete event
+            const poll = async () => {
+                if (!this.operationRunning) return; // SSE already handled it
+                try {
+                    const resp = await fetch(`/subtitles/task/${taskId}`);
+                    if (!resp.ok) return;
+                    const task = await resp.json();
+                    if (task.status === 'complete' || task.status === 'error') {
+                        // SSE missed it — handle completion now
+                        if (this.operationRunning) {
+                            this.handleTaskComplete({
+                                task_id: taskId,
+                                task_type: task.type,
+                                success: task.status === 'complete',
+                                error: task.error || null,
+                            });
+                        }
+                        return;
+                    }
+                    // Still running, poll again
+                    setTimeout(poll, 2000);
+                } catch (e) {
+                    // Network error, retry
+                    setTimeout(poll, 3000);
+                }
+            };
+            // Start polling after a delay to give SSE a chance first
+            setTimeout(poll, 3000);
         },
 
         handleSubtitleStatus(data) {
@@ -569,8 +627,9 @@ window.toggleShowSelect = async function(checkbox, libraryName, ratingKey) {
 
 window.toggleSeasonSelect = async function(checkbox, libraryName, ratingKey) {
     const key = parseInt(checkbox.dataset.key);
+    const isChecked = checkbox.checked;
     try {
-        const action = checkbox.checked ? 'add' : 'remove';
+        const action = isChecked ? 'add' : 'remove';
         const resp = await fetch(`/selection/${action}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -580,6 +639,16 @@ window.toggleSeasonSelect = async function(checkbox, libraryName, ratingKey) {
         const appEl = document.querySelector('[x-data]');
         if (appEl && appEl._x_dataStack) {
             Alpine.$data(appEl).selectionCount = data.count;
+        }
+        // Sync episode checkboxes within this season's panel
+        const seasonDiv = checkbox.closest('[data-season-key]');
+        if (seasonDiv) {
+            const episodeContainer = seasonDiv.querySelector('.episodes-container');
+            if (episodeContainer) {
+                episodeContainer.querySelectorAll('.item-checkbox').forEach(cb => {
+                    cb.checked = isChecked;
+                });
+            }
         }
     } catch (e) {
         console.error('Season select failed:', e);

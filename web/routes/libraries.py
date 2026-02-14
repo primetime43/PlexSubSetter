@@ -4,7 +4,7 @@ import logging
 from flask import Blueprint, render_template, jsonify, redirect, url_for, request, current_app
 
 from core import library_service
-from plexapi.video import Movie
+from plexapi.video import Movie, Season, Show
 from utils.constants import SEARCH_LANGUAGES, SUBTITLE_PROVIDERS
 
 libraries_bp = Blueprint('libraries', __name__)
@@ -227,7 +227,26 @@ def add_selection():
 
     for key in keys:
         if key in items_map:
-            state.add_selection(items_map[key])
+            item = items_map[key]
+        else:
+            continue
+
+        # Expand Season/Show into individual episodes
+        if isinstance(item, Season):
+            try:
+                for episode in item.episodes():
+                    state.add_selection(episode)
+            except Exception as e:
+                logging.error(f"Error expanding season {item.title}: {e}")
+        elif isinstance(item, Show):
+            try:
+                for season in item.seasons():
+                    for episode in season.episodes():
+                        state.add_selection(episode)
+            except Exception as e:
+                logging.error(f"Error expanding show {item.title}: {e}")
+        else:
+            state.add_selection(item)
 
     return jsonify({'count': len(state.selected_items)})
 
@@ -238,8 +257,25 @@ def remove_selection():
     state = current_app.state
     keys = request.json.get('keys', [])
 
+    # Expand Season/Show keys into episode keys
+    expanded_keys = set(keys)
+    plex = state.plex
+    for key in keys:
+        if plex:
+            try:
+                item = plex.fetchItem(key)
+                if isinstance(item, Season):
+                    for episode in item.episodes():
+                        expanded_keys.add(episode.ratingKey)
+                elif isinstance(item, Show):
+                    for season in item.seasons():
+                        for episode in season.episodes():
+                            expanded_keys.add(episode.ratingKey)
+            except Exception:
+                pass
+
     for item in list(state.selected_items):
-        if item.ratingKey in keys:
+        if item.ratingKey in expanded_keys:
             state.remove_selection(item)
 
     return jsonify({'count': len(state.selected_items)})

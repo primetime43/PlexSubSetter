@@ -1,32 +1,70 @@
 <div class="space-y-4">
-    <h3 class="text-lg font-bold">&#128221; Select Subtitles to Download</h3>
+    <p class="text-sm text-gray-400">
+        Found subtitles for <span class="text-white font-bold">{{ found_count }}</span>
+        of <span class="text-white font-bold">{{ total_searched }}</span> items
+    </p>
 
-    {% for item in items %}
-    <div class="bg-gray-800 rounded-lg p-4 space-y-2">
-        <p class="font-bold text-sm">{{ item.title }}</p>
-        <p class="text-xs text-gray-500">{{ item.total_count }} subtitle(s) found</p>
+    {% for show_name, seasons in shows.items() %}
+    <div x-data="{ open: true }" class="bg-gray-800 rounded-lg overflow-hidden">
+        <!-- Show header -->
+        <button @click="open = !open"
+                class="w-full flex items-center justify-between px-4 py-2 bg-gray-700 hover:bg-gray-600 transition-colors cursor-pointer">
+            <span class="font-bold text-sm text-white">{{ show_name }}</span>
+            <svg :class="open ? 'rotate-180' : ''" class="w-4 h-4 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+        </button>
 
-        <!-- Skip option (default) -->
-        <label class="flex items-center gap-2 text-sm text-gray-500 py-1 cursor-pointer">
-            <input type="radio" name="sub-{{ item.rating_key }}" value="-1" checked
-                   class="text-plex-gold focus:ring-plex-gold border-gray-600 bg-gray-900"
-                   onchange="window.setSubSelection({{ item.rating_key }}, -1)">
-            &#8855; Skip - Don't download
-        </label>
-
-        {% for sub in item.subtitles %}
-        <label class="flex items-center gap-2 text-sm text-gray-300 py-1 cursor-pointer hover:text-white">
-            <input type="radio" name="sub-{{ item.rating_key }}" value="{{ sub.index }}"
-                   class="text-plex-gold focus:ring-plex-gold border-gray-600 bg-gray-900"
-                   onchange="window.setSubSelection({{ item.rating_key }}, {{ sub.index }})">
-            <span class="text-plex-gold text-xs">[{{ sub.provider }}]</span>
-            {{ sub.release_info }}
-        </label>
-        {% endfor %}
-
-        {% if item.total_count > item.subtitles|length %}
-        <p class="text-xs text-gray-500 pl-6">...and {{ item.total_count - item.subtitles|length }} more</p>
-        {% endif %}
+        <div x-show="open" x-transition>
+            {% for season_num, episodes in seasons.items() %}
+            <div class="px-4 pt-2 pb-1">
+                <p class="text-xs text-gray-500 font-semibold mb-1">Season {{ season_num }} ({{ episodes|length }} episode{{ 's' if episodes|length != 1 else '' }})</p>
+                <div class="divide-y divide-gray-700">
+                    {% for ep in episodes %}
+                    <div class="flex items-center justify-between py-1.5 gap-3">
+                        <span class="text-sm text-gray-300 truncate flex-shrink-0">{{ ep.episode_title }}
+                            <span class="text-xs text-gray-500">({{ ep.total_count }})</span>
+                        </span>
+                        <select data-sub-select="{{ ep.rating_key }}"
+                                onchange="window.setSubSelection({{ ep.rating_key }}, parseInt(this.value))"
+                                class="flex-1 bg-gray-900 text-sm text-gray-300 border border-gray-600 rounded px-2 py-1 focus:ring-plex-gold focus:border-plex-gold min-w-0">
+                            {% for sub in ep.subtitles %}
+                            <option value="{{ sub.index }}" {{ 'selected' if loop.first else '' }}>[{{ sub.provider }}] {{ sub.release_info }}</option>
+                            {% endfor %}
+                            <option value="-1">Skip - Don't download</option>
+                        </select>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
     </div>
     {% endfor %}
+
+    {% if movies %}
+    <div class="bg-gray-800 rounded-lg overflow-hidden">
+        <div class="px-4 py-2 bg-gray-700">
+            <span class="font-bold text-sm text-white">Movies</span>
+        </div>
+        <div class="px-4 py-2 divide-y divide-gray-700">
+            {% for movie in movies %}
+            <div class="flex items-center justify-between py-1.5 gap-3">
+                <span class="text-sm text-gray-300 truncate flex-shrink-0">{{ movie.title }}
+                    <span class="text-xs text-gray-500">({{ movie.total_count }})</span>
+                </span>
+                <select data-sub-select="{{ movie.rating_key }}"
+                        onchange="window.setSubSelection({{ movie.rating_key }}, parseInt(this.value))"
+                        class="flex-1 bg-gray-900 text-sm text-gray-300 border border-gray-600 rounded px-2 py-1 focus:ring-plex-gold focus:border-plex-gold min-w-0">
+                    {% for sub in movie.subtitles %}
+                    <option value="{{ sub.index }}" {{ 'selected' if loop.first else '' }}>[{{ sub.provider }}] {{ sub.release_info }}</option>
+                    {% endfor %}
+                    <option value="-1">Skip - Don't download</option>
+                </select>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 </div>
+

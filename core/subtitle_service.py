@@ -80,75 +80,101 @@ def search(items, language_name, providers, task_manager=None, timeout=None, sdh
     results = {}
     total = len(items)
 
-    for idx, item in enumerate(items):
+    # Build video objects and map them back to Plex items
+    video_to_item = {}
+    videos = set()
+    for item in items:
+        try:
+            video = _make_video_object(item)
+            video_to_item[video] = item
+            videos.add(video)
+        except Exception as e:
+            title = get_item_title(item)
+            logging.error(f"Error creating video object for {title}: {e}")
+            if task_manager:
+                task_manager.emit('log', {
+                    'message': f"Error preparing {title}: {e}",
+                    'level': 'error',
+                })
+
+    if task_manager:
+        task_manager.emit('progress', {
+            'type': 'search',
+            'current': 0,
+            'total': total,
+            'item': f"Searching {total} items...",
+        })
+        task_manager.emit('log', {'message': f"Searching subtitles for {total} item(s) (single session)..."})
+
+    # Single batched call — one login/logout for all items
+    try:
+        kwargs = {'providers': provider_list}
+        if provider_configs:
+            kwargs['provider_configs'] = provider_configs
+        all_subtitles = list_subtitles(videos, languages={lang}, **kwargs)
+    except Exception as e:
+        logging.error(f"Error in batched subtitle search: {e}")
+        if task_manager:
+            task_manager.emit('log', {
+                'message': f"Search failed: {e}",
+                'level': 'error',
+            })
+        return results
+
+    # Process results per video
+    for video, item in video_to_item.items():
         title = get_item_title(item)
+        subs_list = list(all_subtitles.get(video, []))
 
         if task_manager:
             task_manager.emit('progress', {
                 'type': 'search',
-                'current': idx + 1,
+                'current': len(results) + 1,
                 'total': total,
                 'item': title,
             })
-            task_manager.emit('log', {'message': f"Searching subtitles for: {title}"})
 
-        try:
-            video = _make_video_object(item)
-            kwargs = {'providers': provider_list}
-            if provider_configs:
-                kwargs['provider_configs'] = provider_configs
-            subtitles = list_subtitles({video}, languages={lang}, **kwargs)
-            subs_list = list(subtitles.get(video, []))
+        # Preference sort: SDH/forced subs come first if requested
+        if subs_list and (sdh or forced):
+            def _sort_key(sub):
+                score = 0
+                if sdh and getattr(sub, 'hearing_impaired', False):
+                    score -= 1
+                if forced and getattr(sub, 'forced', False):
+                    score -= 1
+                return score
+            subs_list.sort(key=_sort_key)
 
-            # Preference sort: SDH/forced subs come first if requested
-            if subs_list and (sdh or forced):
-                def _sort_key(sub):
-                    score = 0
-                    if sdh and getattr(sub, 'hearing_impaired', False):
-                        score -= 1
-                    if forced and getattr(sub, 'forced', False):
-                        score -= 1
-                    return score
-                subs_list.sort(key=_sort_key)
+        if subs_list:
+            results[item.ratingKey] = {
+                'title': title,
+                'item': item,
+                'subtitles_raw': subs_list,
+                'subtitles': [],
+            }
+            for i, sub in enumerate(subs_list[:MAX_SUBTITLE_RESULTS]):
+                release_info = (
+                    getattr(sub, 'movie_release_name', None) or
+                    getattr(sub, 'release', None) or
+                    getattr(sub, 'filename', None) or
+                    getattr(sub, 'info', None) or
+                    f"ID: {getattr(sub, 'subtitle_id', 'Unknown')}"
+                )
+                results[item.ratingKey]['subtitles'].append({
+                    'index': i,
+                    'provider': getattr(sub, 'provider_name', 'unknown'),
+                    'release_info': str(release_info)[:100],
+                })
 
-            if subs_list:
-                results[item.ratingKey] = {
-                    'title': title,
-                    'item': item,
-                    'subtitles_raw': subs_list,
-                    'subtitles': [],
-                }
-                for i, sub in enumerate(subs_list[:MAX_SUBTITLE_RESULTS]):
-                    release_info = (
-                        getattr(sub, 'movie_release_name', None) or
-                        getattr(sub, 'release', None) or
-                        getattr(sub, 'filename', None) or
-                        getattr(sub, 'info', None) or
-                        f"ID: {getattr(sub, 'subtitle_id', 'Unknown')}"
-                    )
-                    results[item.ratingKey]['subtitles'].append({
-                        'index': i,
-                        'provider': getattr(sub, 'provider_name', 'unknown'),
-                        'release_info': str(release_info)[:100],
-                    })
-
-                if task_manager:
-                    task_manager.emit('log', {
-                        'message': f"Found {len(subs_list)} subtitle(s) for: {title}"
-                    })
-            else:
-                if task_manager:
-                    task_manager.emit('log', {
-                        'message': f"No subtitles found for: {title}",
-                        'level': 'warning',
-                    })
-
-        except Exception as e:
-            logging.error(f"Error searching subtitles for {title}: {e}")
             if task_manager:
                 task_manager.emit('log', {
-                    'message': f"Error searching for {title}: {e}",
-                    'level': 'error',
+                    'message': f"Found {len(subs_list)} subtitle(s) for: {title}"
+                })
+        else:
+            if task_manager:
+                task_manager.emit('log', {
+                    'message': f"No subtitles found for: {title}",
+                    'level': 'warning',
                 })
 
     return results
@@ -185,77 +211,78 @@ def download(items, search_results, selections, language_name, save_method, task
 
         result_data = search_results.get(rating_key)
         if not result_data:
+            logging.warning(f"Download: no search results for rating_key={rating_key} (type={type(rating_key)}), available keys={list(search_results.keys())[:5]}")
             continue
 
         subs_list = result_data.get('subtitles_raw', [])
         if selected_index >= len(subs_list):
+            logging.warning(f"Download: selected_index={selected_index} >= subs count={len(subs_list)} for {result_data.get('title')}")
             continue
 
         download_tasks.append((rating_key, result_data, subs_list[selected_index]))
 
-    def _download_one(task_info):
-        rating_key, result_data, selected_sub = task_info
-        item = result_data['item']
-        title = result_data['title']
+    logging.info(f"Download: {len(selections)} selections, {len(download_tasks)} tasks to download")
 
+    if download_tasks:
+        # Batch download all subtitles in a single provider session
+        all_subs = [task[2] for task in download_tasks]
+        all_providers = list({getattr(sub, 'provider_name', 'unknown') for sub in all_subs})
         try:
-            provider = getattr(selected_sub, 'provider_name', 'unknown')
-            download_subtitles([selected_sub], providers=[provider])
-
-            temp_dir = tempfile.gettempdir()
-            subtitle_filename = sanitize_subtitle_filename(item, language_code)
-            subtitle_path = os.path.join(temp_dir, subtitle_filename)
-
-            try:
-                validate_subtitle_content_size(selected_sub.content)
-            except ValueError as e:
-                if task_manager:
-                    task_manager.emit('log', {'message': f"Error: {e}", 'level': 'error'})
-                return None
-
-            try:
-                with open(subtitle_path, 'wb') as f:
-                    f.write(selected_sub.content)
-
-                if save_method == 'file':
-                    _save_to_file(item, subtitle_path, language_code, task_manager)
-                else:
-                    item.uploadSubtitles(subtitle_path)
-
-                if task_manager:
-                    task_manager.emit('log', {'message': f"Successfully downloaded subtitle for: {title}"})
-                return rating_key
-            finally:
-                try:
-                    os.remove(subtitle_path)
-                except (OSError, PermissionError) as cleanup_error:
-                    logging.debug(f"Could not delete temp file: {cleanup_error}")
-
-        except Exception as e:
-            logging.error(f"Error downloading subtitle for {title}: {e}")
             if task_manager:
-                task_manager.emit('log', {'message': f"Error downloading for {title}: {e}", 'level': 'error'})
-            return None
+                task_manager.emit('log', {'message': f"Downloading {len(all_subs)} subtitle(s) (single session)..."})
+            download_subtitles(all_subs, providers=all_providers)
+        except Exception as e:
+            logging.error(f"Batch download error: {e}")
+            if task_manager:
+                task_manager.emit('log', {'message': f"Download error: {e}", 'level': 'error'})
 
-    # Execute downloads with thread pool
-    completed = 0
-    max_workers = max(1, min(concurrent_downloads, len(download_tasks) or 1))
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(_download_one, task): task for task in download_tasks}
-        for future in concurrent.futures.as_completed(futures):
-            completed += 1
-            task_info = futures[future]
-            title = task_info[1]['title']
+        # Save each downloaded subtitle
+        for idx, (rating_key, result_data, selected_sub) in enumerate(download_tasks):
+            item = result_data['item']
+            title = result_data['title']
+
             if task_manager:
                 task_manager.emit('progress', {
                     'type': 'download',
-                    'current': completed,
+                    'current': idx + 1,
                     'total': total_count,
                     'item': title,
                 })
-            result_key = future.result()
-            if result_key is not None:
-                successful_keys.append(result_key)
+
+            try:
+                if not getattr(selected_sub, 'content', None):
+                    if task_manager:
+                        task_manager.emit('log', {'message': f"No content downloaded for: {title}", 'level': 'warning'})
+                    continue
+
+                validate_subtitle_content_size(selected_sub.content)
+
+                temp_dir = tempfile.gettempdir()
+                subtitle_filename = sanitize_subtitle_filename(item, language_code)
+                subtitle_path = os.path.join(temp_dir, subtitle_filename)
+
+                try:
+                    with open(subtitle_path, 'wb') as f:
+                        f.write(selected_sub.content)
+
+                    if save_method == 'file':
+                        _save_to_file(item, subtitle_path, language_code, task_manager)
+                    else:
+                        item.uploadSubtitles(subtitle_path)
+
+                    if task_manager:
+                        task_manager.emit('log', {'message': f"Successfully downloaded subtitle for: {title}"})
+                    successful_keys.append(rating_key)
+                finally:
+                    try:
+                        os.remove(subtitle_path)
+                    except (OSError, PermissionError) as cleanup_error:
+                        logging.debug(f"Could not delete temp file: {cleanup_error}")
+
+            except Exception as e:
+                logging.error(f"Error saving subtitle for {title}: {e}")
+                if task_manager:
+                    task_manager.emit('log', {'message': f"Error saving for {title}: {e}", 'level': 'error'})
 
     # Reload successful items
     for rk in successful_keys:
@@ -338,6 +365,8 @@ def dry_run(items, language_name, providers, task_manager=None, timeout=None, sd
     errors = []
     total = len(items)
 
+    # First pass: separate items that already have subs from those needing search
+    needs_search = []  # (item, title) pairs
     for idx, item in enumerate(items):
         title = get_item_title(item)
 
@@ -350,7 +379,6 @@ def dry_run(items, language_name, providers, task_manager=None, timeout=None, sd
             })
 
         try:
-            # Check if already has subtitles for this language
             has_subs = False
             for media in item.media:
                 for part in media.parts:
@@ -365,27 +393,50 @@ def dry_run(items, language_name, providers, task_manager=None, timeout=None, sd
 
             if has_subs:
                 already_have.append({'title': title, 'rating_key': item.ratingKey})
-                continue
-
-            video = _make_video_object(item)
-            kwargs = {'providers': provider_list}
-            if provider_configs:
-                kwargs['provider_configs'] = provider_configs
-            subtitles = list_subtitles({video}, languages={lang}, **kwargs)
-            count = len(list(subtitles.get(video, [])))
-
-            if count > 0:
-                available.append({'title': title, 'rating_key': item.ratingKey, 'count': count})
             else:
-                not_available.append({'title': title, 'rating_key': item.ratingKey})
-
-            if task_manager:
-                task_manager.emit('log', {'message': f"{title}: {count} subtitle(s) available"})
-
+                needs_search.append((item, title))
         except Exception as e:
             errors.append({'title': title, 'rating_key': item.ratingKey, 'error': str(e)})
             if task_manager:
                 task_manager.emit('log', {'message': f"Error checking {title}: {e}", 'level': 'error'})
+
+    # Second pass: batch search all items that need subtitles
+    if needs_search:
+        video_to_info = {}
+        videos = set()
+        for item, title in needs_search:
+            try:
+                video = _make_video_object(item)
+                video_to_info[video] = (item, title)
+                videos.add(video)
+            except Exception as e:
+                errors.append({'title': title, 'rating_key': item.ratingKey, 'error': str(e)})
+
+        if videos:
+            if task_manager:
+                task_manager.emit('log', {'message': f"Searching subtitles for {len(videos)} item(s) (single session)..."})
+
+            try:
+                kwargs = {'providers': provider_list}
+                if provider_configs:
+                    kwargs['provider_configs'] = provider_configs
+                all_subtitles = list_subtitles(videos, languages={lang}, **kwargs)
+
+                for video, (item, title) in video_to_info.items():
+                    count = len(list(all_subtitles.get(video, [])))
+                    if count > 0:
+                        available.append({'title': title, 'rating_key': item.ratingKey, 'count': count})
+                    else:
+                        not_available.append({'title': title, 'rating_key': item.ratingKey})
+
+                    if task_manager:
+                        task_manager.emit('log', {'message': f"{title}: {count} subtitle(s) available"})
+            except Exception as e:
+                logging.error(f"Error in batched subtitle search: {e}")
+                for video, (item, title) in video_to_info.items():
+                    errors.append({'title': title, 'rating_key': item.ratingKey, 'error': str(e)})
+                if task_manager:
+                    task_manager.emit('log', {'message': f"Search failed: {e}", 'level': 'error'})
 
     return {
         'already_have': already_have,
