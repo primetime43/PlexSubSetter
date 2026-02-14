@@ -42,54 +42,58 @@ function appState() {
 
         // Log refresh
         _logInterval: null,
-        _logFirstLoad: true,
+        _logLoaded: false,
 
         init() {
             // Load libraries on init
             this.loadLibraries();
 
-            // Auto-refresh logs while modal is open
+            // Auto-refresh logs while panel is open
             this.$watch('showLogs', (open) => {
                 if (open) {
-                    this._logFirstLoad = true;
-                    this._loadLogModal();
-                    this._logInterval = setInterval(() => this._refreshLogContent(), 3000);
-                } else if (this._logInterval) {
-                    clearInterval(this._logInterval);
-                    this._logInterval = null;
+                    this._openLogPanel();
+                } else {
+                    this._closeLogPanel();
                 }
             });
         },
 
-        async _loadLogModal() {
-            // First load: fetch full modal HTML
-            const container = document.getElementById('log-modal-content');
-            if (!container) return;
-            try {
-                const resp = await fetch('/logs');
-                if (resp.ok) {
-                    container.innerHTML = await resp.text();
-                    // Scroll to bottom on first open
-                    const logArea = document.getElementById('log-content-area');
-                    if (logArea) logArea.scrollTop = logArea.scrollHeight;
-                    this._logFirstLoad = false;
-                }
-            } catch (e) { /* modal may have closed */ }
+        async _openLogPanel() {
+            // Load full modal HTML if first time
+            if (!this._logLoaded) {
+                const container = document.getElementById('log-modal-content');
+                if (!container) return;
+                try {
+                    const resp = await fetch('/logs');
+                    if (resp.ok) {
+                        container.innerHTML = await resp.text();
+                        this._logLoaded = true;
+                    }
+                } catch (e) { return; }
+            }
+            // Always refresh content and scroll to bottom on open
+            await this._refreshLogContent(true);
+            // Start polling
+            this._logInterval = setInterval(() => this._refreshLogContent(false), 3000);
         },
 
-        async _refreshLogContent() {
-            // Subsequent refreshes: only update text, preserve scroll
+        _closeLogPanel() {
+            if (this._logInterval) {
+                clearInterval(this._logInterval);
+                this._logInterval = null;
+            }
+        },
+
+        async _refreshLogContent(scrollToBottom) {
             const logArea = document.getElementById('log-content-area');
             if (!logArea) return;
             try {
                 const resp = await fetch('/logs/content');
-                if (resp.ok) {
-                    const wasAtBottom = (logArea.scrollHeight - logArea.scrollTop - logArea.clientHeight) < 30;
-                    logArea.textContent = await resp.text();
-                    // Only auto-scroll if user was already at the bottom
-                    if (wasAtBottom) logArea.scrollTop = logArea.scrollHeight;
-                }
-            } catch (e) { /* modal may have closed */ }
+                if (!resp.ok) return;
+                const wasAtBottom = scrollToBottom || (logArea.scrollHeight - logArea.scrollTop - logArea.clientHeight) < 30;
+                logArea.textContent = await resp.text();
+                if (wasAtBottom) logArea.scrollTop = logArea.scrollHeight;
+            } catch (e) { /* panel may have closed */ }
         },
 
         async loadLibraries() {

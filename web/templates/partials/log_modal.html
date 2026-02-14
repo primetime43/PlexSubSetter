@@ -1,16 +1,11 @@
-<div class="space-y-4">
-    <div class="flex items-center justify-between">
-        <div>
-            <h2 class="text-xl font-bold">&#128203; Application Log</h2>
-            <p class="text-xs text-gray-500 mt-1">{{ log_file }}</p>
+<div>
+    <div class="flex items-center justify-between pb-2 border-b border-gray-800">
+        <div class="flex items-center gap-2">
+            <h3 class="text-sm font-bold">Application Log</h3>
+            <span class="text-xs text-gray-600">live</span>
         </div>
-        <button @click="showLogs = false" class="text-gray-400 hover:text-white text-xl">&times;</button>
+        <button @click="showLogs = false" class="text-gray-400 hover:text-white text-lg leading-none">&times;</button>
     </div>
 
-    <div id="log-content-area" class="bg-gray-950 border border-gray-800 rounded-lg p-4 max-h-96 overflow-y-auto font-mono text-xs leading-relaxed text-gray-300 whitespace-pre-wrap">{{ log_content if log_content else 'No log content available.' }}</div>
-
-    <div class="flex justify-between items-center">
-        <span class="text-xs text-gray-600">Auto-refreshes every 3s</span>
-        <button @click="showLogs = false" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm">Close</button>
-    </div>
+    <div id="log-content-area" class="bg-gray-950 rounded mt-2 p-3 overflow-y-auto font-mono text-xs leading-relaxed text-gray-300 whitespace-pre-wrap" style="height: 320px;">{{ log_content if log_content else 'No log content available.' }}</div>
 </div>

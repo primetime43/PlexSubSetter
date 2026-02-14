@@ -2,7 +2,7 @@
 
 import os
 import logging
-from flask import Blueprint, render_template, current_app
+from flask import Blueprint, render_template, current_app, Response
 
 logs_bp = Blueprint('logs', __name__)
 
@@ -47,5 +47,4 @@ def get_log_content():
         except Exception as e:
             content = f"Error reading log file: {e}"
 
-    from flask import Response
     return Response(content or "No log content available.", mimetype='text/plain')
