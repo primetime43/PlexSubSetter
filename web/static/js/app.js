@@ -5,6 +5,7 @@
 // Global state for current library
 let currentLibrary = '';
 let currentPage = 1;
+let fetchGeneration = 0;
 
 // Subtitle selections for download: { ratingKey: selectedIndex }
 let subSelections = {};
@@ -168,6 +169,7 @@ function appState() {
 
         async _fetchItems() {
             if (!currentLibrary) { console.log('_fetchItems: no currentLibrary'); return; }
+            const myGen = ++fetchGeneration;
             console.log('_fetchItems: fetching page', currentPage, 'library', currentLibrary);
             const params = new URLSearchParams({
                 page: currentPage,
@@ -180,6 +182,7 @@ function appState() {
 
             try {
                 const resp = await fetch(`/libraries/${encodeURIComponent(currentLibrary)}/items?${params}`);
+                if (myGen !== fetchGeneration) return; // stale response, discard
                 const html = await resp.text();
                 target.innerHTML = html;
 

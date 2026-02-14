@@ -52,17 +52,17 @@
             class="text-xs px-3 py-1 rounded border border-gray-700 text-gray-300 hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed">
         &lsaquo; Prev
     </button>
-    <span class="text-xs text-gray-500">Page {{ page }} of {{ total_pages }} ({{ start }}-{{ end }} of {{ total_items }})</span>
+    <span class="text-xs text-gray-500 text-center leading-snug">Page {{ page }}/{{ total_pages }}<br>{% if effective_filter != 'all' %}{{ total_items }} of {{ unfiltered_count }}{% else %}{{ start }}-{{ end }} of {{ total_items }}{% endif %}</span>
     <button onclick="window.changePage({{ page + 1 }})" {% if page >= total_pages %}disabled{% endif %}
             class="text-xs px-3 py-1 rounded border border-gray-700 text-gray-300 hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed">
         Next &rsaquo;
     </button>
     {% else %}
-    <span class="text-xs text-gray-500 w-full text-center">{{ total_items }} item{{ 's' if total_items != 1 }} total</span>
+    <span class="text-xs text-gray-500 w-full text-center">{{ total_items }} item{{ 's' if total_items != 1 }}{% if effective_filter != 'all' %} filtered ({{ unfiltered_count }} total){% endif %}</span>
     {% endif %}
 </div>
 
-{% if not cache_complete and subtitle_filter != 'all' %}
+{% if subtitle_filter != 'all' and effective_filter == 'all' %}
 <script>
     Alpine.$data(document.querySelector('[x-data]')).filterStatus = 'Scanning subtitle status... filter will apply when complete.';
     Alpine.$data(document.querySelector('[x-data]'))._cacheWaitingFilter = '{{ subtitle_filter }}';
@@ -71,7 +71,7 @@
 <script>
     Alpine.$data(document.querySelector('[x-data]')).filterStatus = 'Showing {{ filtered_count }}/{{ unfiltered_count }} matching "{{ search }}"';
 </script>
-{% elif subtitle_filter != 'all' %}
+{% elif effective_filter != 'all' %}
 <script>
     Alpine.$data(document.querySelector('[x-data]')).filterStatus = 'Showing {{ filtered_count }}/{{ unfiltered_count }} {{ "without" if subtitle_filter == "missing" else "with" }} subtitles';
 </script>

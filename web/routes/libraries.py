@@ -79,20 +79,36 @@ def library_items(name):
     items = state.library_items_cache[name]
     is_movie = isinstance(items[0], Movie) if items else False
 
-    # Start background subtitle cache for movies (only once)
+    # Subtitle cache for movies
     cache = state.subtitle_status_cache  # direct dict ref, reads are thread-safe in CPython
     if is_movie:
-        uncached = [i for i in items if i.ratingKey not in cache]
-        if uncached:
-            tm = current_app.task_manager
-            # Only submit if no subtitle_cache task is already running
-            running = any(
-                t['type'] == 'subtitle_cache' and t['status'] == 'running'
-                for t in tm._tasks.values()
-            )
-            if not running:
-                tm.submit('subtitle_cache', library_service.batch_check_subtitles,
-                          items=uncached, state=state, task_manager=tm)
+        all_uncached = [i for i in items if i.ratingKey not in cache]
+
+        if all_uncached:
+            # Synchronously check the current page's items so the first response has indicators.
+            # Compute which items will be on this page (approximate — before subtitle filtering).
+            start_idx = (page - 1) * ITEMS_PER_PAGE
+            end_idx = start_idx + ITEMS_PER_PAGE
+            if search:
+                search_lower = search.lower()
+                page_candidates = [i for i in items if search_lower in i.title.lower()][start_idx:end_idx]
+            else:
+                page_candidates = items[start_idx:end_idx]
+            page_uncached = [i for i in page_candidates if i.ratingKey not in cache]
+            if page_uncached:
+                library_service.batch_check_subtitles_sync(page_uncached, state)
+
+            # Background task for remaining uncached items (not on this page)
+            remaining = [i for i in items if i.ratingKey not in cache]
+            if remaining:
+                tm = current_app.task_manager
+                running = any(
+                    t['type'] == 'subtitle_cache' and t['status'] == 'running'
+                    for t in tm._tasks.values()
+                )
+                if not running:
+                    tm.submit('subtitle_cache', library_service.batch_check_subtitles,
+                              items=remaining, state=state, task_manager=tm)
 
     # Check if cache is complete enough for filtering
     cache_complete = all(i.ratingKey in cache for i in items) if is_movie else True
@@ -118,6 +134,7 @@ def library_items(name):
                            unfiltered_count=result['unfiltered_count'],
                            search=search,
                            subtitle_filter=subtitle_filter,
+                           effective_filter=effective_filter,
                            subtitle_cache=state.subtitle_status_cache,
                            selected_keys=selected_keys,
                            library_name=name,

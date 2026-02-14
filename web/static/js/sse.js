@@ -52,11 +52,9 @@
             const appEl = document.querySelector('[x-data]');
             if (appEl && appEl._x_dataStack) {
                 const state = Alpine.$data(appEl);
-                // If a filter was waiting for the cache, apply it now
-                if (state.subFilter !== 'all' || state._cacheWaitingFilter) {
-                    state._cacheWaitingFilter = null;
-                    state._fetchItems();
-                }
+                state._cacheWaitingFilter = null;
+                // Always re-fetch so indicators render from the now-populated cache
+                state._fetchItems();
             }
         });
 
