@@ -2,9 +2,20 @@
 
 Stop going episode by episode to set subtitles in Plex! PlexSubSetter lets you search, download, and manage subtitles for entire seasons, shows, or your whole movie library at once. This will allow you to set the subtitles easily.
 
-![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.5.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
+
+## Table of Contents
+- [Why I Built This](#why-i-built-this)
+- [What It Does](#what-it-does)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+- [How to Use](#how-to-use)
+- [Architecture](#architecture)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
 
 ## Why I Built This
 
@@ -51,7 +62,7 @@ pip install -r requirements.txt
 
 **Windows:**
 ```batch
-run_gui.bat
+run.bat
 ```
 or
 ```bash
@@ -60,7 +71,7 @@ python app.py
 
 **Linux/Mac:**
 ```bash
-./run_gui.sh
+./run.sh
 ```
 or
 ```bash
