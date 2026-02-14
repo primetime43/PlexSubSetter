@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title_suffix %} - {{ server_name }}{% endblock %}
+
+{% block body %}
+<div class="h-screen flex flex-col" x-data="appState()" sse-connect="/events">
+    <!-- Top header bar -->
+    <header class="bg-gray-900 border-b border-gray-800 px-6 py-3 flex items-center justify-between flex-shrink-0">
+        <h1 class="text-xl font-bold">
+            <span class="text-gray-400 mr-2">&#128250;</span>
+            {{ server_name }}
+        </h1>
+        <div class="flex items-center gap-3">
+            <button @click="showSettings = true" class="px-3 py-1.5 border border-gray-600 rounded text-sm text-gray-300 hover:bg-gray-800">
+                &#9881; Settings
+            </button>
+            <button @click="showLogs = true" class="px-3 py-1.5 border border-gray-600 rounded text-sm text-gray-300 hover:bg-gray-800">
+                &#128203; Logs
+            </button>
+            <form action="/auth/logout" method="post" class="inline">
+                <button type="submit" class="px-3 py-1.5 border border-gray-600 rounded text-sm text-gray-300 hover:bg-gray-800">
+                    Change Server
+                </button>
+            </form>
+        </div>
+    </header>
+
+    <!-- Main content: two-column layout -->
+    <div class="flex-1 flex overflow-hidden">
+        <!-- LEFT PANEL: Library Browser -->
+        <aside class="w-96 flex-shrink-0 bg-gray-900 border-r border-gray-800 flex flex-col">
+            <!-- Library selector -->
+            <div class="p-4 space-y-3 border-b border-gray-800">
+                <h2 class="font-bold text-sm text-gray-400 uppercase tracking-wider">Library Browser</h2>
+                <select id="library-select"
+                        @change="loadLibrary($event.target.value)"
+                        class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:border-plex-gold focus:outline-none">
+                    <option value="">Select a library...</option>
+                </select>
+                <button @click="reloadLibrary()" class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm hover:bg-gray-700">
+                    &#128260; Reload Library
+                </button>
+            </div>
+
+            <!-- Search and filter -->
+            <div class="p-4 space-y-2 border-b border-gray-800">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-500">Search:</span>
+                    <input type="text" x-model="searchText" @input.debounce.300ms="filterItems()"
+                           placeholder="Type to filter by title..."
+                           class="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm focus:border-plex-gold focus:outline-none placeholder-gray-600">
+                    <button @click="searchText=''; filterItems()" class="text-gray-500 hover:text-gray-300 px-1">&times;</button>
+                </div>
+                <!-- Subtitle filter buttons (movies only) -->
+                <div x-show="showSubFilter" class="flex gap-1" x-cloak>
+                    <button @click="setSubFilter('all')"
+                            :class="subFilter === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 border border-gray-700'"
+                            class="flex-1 rounded px-2 py-1 text-xs">All</button>
+                    <button @click="setSubFilter('missing')"
+                            :class="subFilter === 'missing' ? 'bg-red-700 text-white' : 'bg-gray-800 text-gray-400 border border-gray-700'"
+                            class="flex-1 rounded px-2 py-1 text-xs">Missing</button>
+                    <button @click="setSubFilter('has')"
+                            :class="subFilter === 'has' ? 'bg-green-700 text-white' : 'bg-gray-800 text-gray-400 border border-gray-700'"
+                            class="flex-1 rounded px-2 py-1 text-xs">Has Subs</button>
+                </div>
+                <p x-show="filterStatus" class="text-xs text-gray-500" x-text="filterStatus" x-cloak></p>
+            </div>
+
+            <!-- Browser items (htmx target) -->
+            <div id="browser-items" class="flex-1 overflow-y-auto p-2">
+                <div class="text-gray-500 text-sm text-center py-8">Select a library to browse</div>
+            </div>
+
+            <!-- Pagination (htmx target) -->
+            <div id="pagination" class="border-t border-gray-800 p-2"></div>
+
+            <!-- Selection controls -->
+            <div class="border-t border-gray-800 p-4 space-y-2">
+                <p class="text-xs text-gray-400" x-text="selectionCount + ' items selected'"></p>
+                <div class="flex gap-2">
+                    <button @click="selectAll()" class="flex-1 border border-gray-600 rounded px-2 py-1 text-xs text-gray-300 hover:bg-gray-800">Select All</button>
+                    <button @click="clearSelection()" class="flex-1 border border-gray-600 rounded px-2 py-1 text-xs text-gray-300 hover:bg-gray-800">Clear</button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- RIGHT PANEL: Controls + Results -->
+        <main class="flex-1 flex flex-col overflow-hidden">
+            <!-- Options bar -->
+            <div class="p-4 bg-gray-900/50 border-b border-gray-800 space-y-3">
+                <div class="flex items-end gap-4 flex-wrap">
+                    <div class="flex-1 min-w-48">
+                        <label class="text-xs font-bold text-gray-400 block mb-1">Search Language</label>
+                        <select x-model="language" class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm focus:border-plex-gold focus:outline-none">
+                            {% for lang_name in languages %}
+                            <option value="{{ lang_name }}" {% if lang_name == settings.get('default_language', 'English') %}selected{% endif %}>{{ lang_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="flex-1 min-w-48">
+                        <label class="text-xs font-bold text-gray-400 block mb-1">Subtitle Provider</label>
+                        <select x-model="provider" class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm focus:border-plex-gold focus:outline-none">
+                            {% for prov_name, prov_val in providers.items() %}
+                            <option value="{{ prov_val }}">{{ prov_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <label class="flex items-center gap-2 text-sm text-gray-300">
+                        <input type="checkbox" x-model="sdh" class="rounded border-gray-600 bg-gray-800">
+                        SDH
+                    </label>
+                    <label class="flex items-center gap-2 text-sm text-gray-300">
+                        <input type="checkbox" x-model="forced" class="rounded border-gray-600 bg-gray-800">
+                        Forced
+                    </label>
+                </div>
+
+                <!-- Action buttons -->
+                <div class="flex gap-2 flex-wrap">
+                    <button @click="searchSubtitles()" :disabled="selectionCount === 0 || operationRunning"
+                            class="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed rounded px-4 py-2 text-sm font-medium">
+                        &#128269; Search Available
+                    </button>
+                    <button @click="listSubtitles()" :disabled="selectionCount === 0 || operationRunning"
+                            class="bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed rounded px-4 py-2 text-sm font-medium">
+                        &#128203; List Current
+                    </button>
+                    <button @click="dryRun()" :disabled="selectionCount === 0 || operationRunning"
+                            class="bg-green-700 hover:bg-green-600 disabled:opacity-40 disabled:cursor-not-allowed rounded px-4 py-2 text-sm font-medium">
+                        &#128065; Dry Run
+                    </button>
+                    <button @click="deleteSubtitles()" :disabled="selectionCount === 0 || operationRunning"
+                            class="bg-red-800 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed rounded px-4 py-2 text-sm font-medium">
+                        &#128465; Delete
+                    </button>
+                </div>
+            </div>
+
+            <!-- Progress bar -->
+            <div x-show="operationRunning" class="px-4 py-2 bg-gray-900/50" x-cloak>
+                <div class="flex items-center gap-3">
+                    <div class="flex-1 bg-gray-800 rounded-full h-2 overflow-hidden">
+                        <div class="bg-plex-gold h-full transition-all duration-300 rounded-full"
+                             :style="'width: ' + progressPercent + '%'"></div>
+                    </div>
+                    <span class="text-xs text-gray-400 whitespace-nowrap" x-text="progressText"></span>
+                </div>
+            </div>
+
+            <!-- Info/Results panel -->
+            <div id="info-panel" class="flex-1 overflow-y-auto p-4">
+                <div class="text-gray-500 text-sm text-center py-8">
+                    Select items and use the action buttons above to manage subtitles.
+                </div>
+            </div>
+
+            <!-- Download button -->
+            <div x-show="hasSearchResults" class="border-t border-gray-800 p-4" x-cloak>
+                <button @click="downloadSubtitles()" :disabled="operationRunning"
+                        class="w-full bg-plex-gold hover:bg-plex-gold-hover text-gray-900 font-bold rounded px-4 py-3 text-sm disabled:opacity-40 disabled:cursor-not-allowed">
+                    &#11015; Download Selected Subtitles
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Settings Modal -->
+    <div x-show="showSettings" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" @keydown.escape.window="showSettings = false">
+        <div class="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-2xl" @click.away="showSettings = false">
+            <div class="p-6" hx-get="/settings" hx-trigger="intersect once" hx-swap="innerHTML">
+                <div class="text-center py-8 text-gray-400">Loading settings...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logs Modal -->
+    <div x-show="showLogs" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" @keydown.escape.window="showLogs = false">
+        <div class="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-3xl max-h-[85vh] overflow-y-auto shadow-2xl" @click.away="showLogs = false">
+            <div class="p-6" hx-get="/logs" hx-trigger="intersect once" hx-swap="innerHTML">
+                <div class="text-center py-8 text-gray-400">Loading logs...</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

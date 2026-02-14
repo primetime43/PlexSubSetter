@@ -1,0 +1,175 @@
+<div x-data="settingsPanel()" class="space-y-6">
+    <div class="flex items-center justify-between">
+        <h2 class="text-xl font-bold">&#9881; Settings</h2>
+        <button @click="$dispatch('close-settings'); showSettings = false" class="text-gray-400 hover:text-white text-xl">&times;</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex border-b border-gray-700 gap-1">
+        <button @click="tab = 'general'" :class="tab === 'general' ? 'border-plex-gold text-plex-gold' : 'border-transparent text-gray-400 hover:text-gray-200'"
+                class="px-4 py-2 text-sm border-b-2 -mb-px">General</button>
+        <button @click="tab = 'subtitles'" :class="tab === 'subtitles' ? 'border-plex-gold text-plex-gold' : 'border-transparent text-gray-400 hover:text-gray-200'"
+                class="px-4 py-2 text-sm border-b-2 -mb-px">Subtitles</button>
+        <button @click="tab = 'ui'" :class="tab === 'ui' ? 'border-plex-gold text-plex-gold' : 'border-transparent text-gray-400 hover:text-gray-200'"
+                class="px-4 py-2 text-sm border-b-2 -mb-px">UI/Behavior</button>
+        <button @click="tab = 'advanced'" :class="tab === 'advanced' ? 'border-plex-gold text-plex-gold' : 'border-transparent text-gray-400 hover:text-gray-200'"
+                class="px-4 py-2 text-sm border-b-2 -mb-px">Advanced</button>
+    </div>
+
+    <!-- General Tab -->
+    <div x-show="tab === 'general'" class="space-y-4">
+        <div>
+            <label class="text-sm font-bold block mb-1">Default Subtitle Language</label>
+            <select x-model="s.default_language" class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm">
+                {% for lang in languages %}
+                <option value="{{ lang }}" {% if lang == settings.default_language %}selected{% endif %}>{{ lang }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="flex items-center gap-2 text-sm">
+                <input type="checkbox" x-model="s.remember_last_library" class="rounded border-gray-600 bg-gray-800">
+                Remember last selected library
+            </label>
+        </div>
+    </div>
+
+    <!-- Subtitles Tab -->
+    <div x-show="tab === 'subtitles'" x-cloak class="space-y-4">
+        <div>
+            <label class="text-sm font-bold block mb-2">Subtitle Save Method</label>
+            <div class="space-y-2">
+                <label class="flex items-start gap-2 text-sm bg-gray-800 p-3 rounded cursor-pointer" :class="s.subtitle_save_method === 'plex' ? 'ring-1 ring-plex-gold' : ''">
+                    <input type="radio" x-model="s.subtitle_save_method" value="plex" class="mt-0.5">
+                    <div>
+                        <p class="font-medium">Upload to Plex (Recommended)</p>
+                        <p class="text-xs text-gray-500">Works with remote servers</p>
+                    </div>
+                </label>
+                <label class="flex items-start gap-2 text-sm bg-gray-800 p-3 rounded cursor-pointer" :class="s.subtitle_save_method === 'file' ? 'ring-1 ring-plex-gold' : ''">
+                    <input type="radio" x-model="s.subtitle_save_method" value="file" class="mt-0.5">
+                    <div>
+                        <p class="font-medium">Save next to video file</p>
+                        <p class="text-xs text-gray-500">Requires local file access</p>
+                    </div>
+                </label>
+            </div>
+        </div>
+        <div>
+            <label class="flex items-center gap-2 text-sm">
+                <input type="checkbox" x-model="s.prefer_hearing_impaired" class="rounded border-gray-600 bg-gray-800">
+                Prefer hearing impaired (SDH) subtitles
+            </label>
+        </div>
+        <div>
+            <label class="flex items-center gap-2 text-sm">
+                <input type="checkbox" x-model="s.prefer_forced" class="rounded border-gray-600 bg-gray-800">
+                Prefer forced subtitles
+            </label>
+        </div>
+        <div>
+            <label class="text-sm font-bold block mb-1">Default Providers</label>
+            <input type="text" x-model="s.default_providers" class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm">
+            <p class="text-xs text-gray-500 mt-1">Comma-separated: opensubtitles, podnapisi, tvsubtitles, addic7ed</p>
+        </div>
+        <div>
+            <label class="text-sm font-bold block mb-1">Search Timeout: <span x-text="s.search_timeout + 's'"></span></label>
+            <input type="range" x-model.number="s.search_timeout" min="{{ min_timeout }}" max="{{ max_timeout }}" step="5"
+                   class="w-full accent-plex-gold">
+        </div>
+    </div>
+
+    <!-- UI/Behavior Tab -->
+    <div x-show="tab === 'ui'" x-cloak class="space-y-4">
+        <div>
+            <label class="text-sm font-bold block mb-2">Default Subtitle Filter</label>
+            <div class="flex gap-3">
+                <label class="text-sm"><input type="radio" x-model="s.default_subtitle_filter" value="all" class="mr-1"> All</label>
+                <label class="text-sm"><input type="radio" x-model="s.default_subtitle_filter" value="missing" class="mr-1"> Missing</label>
+                <label class="text-sm"><input type="radio" x-model="s.default_subtitle_filter" value="has" class="mr-1"> Has</label>
+            </div>
+        </div>
+        <div>
+            <label class="flex items-center gap-2 text-sm">
+                <input type="checkbox" x-model="s.confirm_batch_operations" class="rounded border-gray-600 bg-gray-800">
+                Confirm before batch operations
+            </label>
+        </div>
+        <div>
+            <label class="text-sm font-bold block mb-1">Batch threshold: <span x-text="s.batch_operation_threshold"></span> items</label>
+            <input type="range" x-model.number="s.batch_operation_threshold" min="5" max="50" step="5"
+                   class="w-full accent-plex-gold">
+        </div>
+    </div>
+
+    <!-- Advanced Tab -->
+    <div x-show="tab === 'advanced'" x-cloak class="space-y-4">
+        <p class="text-plex-gold text-sm font-bold">&#9888; Advanced Settings</p>
+        <div>
+            <label class="text-sm font-bold block mb-1">Concurrent Downloads: <span x-text="s.concurrent_downloads"></span></label>
+            <input type="range" x-model.number="s.concurrent_downloads" min="1" max="10" step="1"
+                   class="w-full accent-plex-gold">
+        </div>
+        <div>
+            <label class="flex items-center gap-2 text-sm">
+                <input type="checkbox" x-model="s.enable_debug_logging" class="rounded border-gray-600 bg-gray-800">
+                Enable debug logging
+            </label>
+            <p class="text-xs text-gray-500 ml-6">Increases log detail and file size</p>
+        </div>
+    </div>
+
+    <!-- Buttons -->
+    <div class="flex justify-between pt-4 border-t border-gray-700">
+        <button @click="resetDefaults()" class="px-4 py-2 border border-gray-600 rounded text-sm text-gray-300 hover:bg-gray-800">Reset to Defaults</button>
+        <div class="flex gap-2">
+            <button @click="showSettings = false" class="px-4 py-2 border border-gray-600 rounded text-sm text-gray-300 hover:bg-gray-800">Cancel</button>
+            <button @click="saveSettings()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm font-medium">Save Settings</button>
+        </div>
+    </div>
+</div>
+
+<script>
+function settingsPanel() {
+    return {
+        tab: 'general',
+        s: {
+            default_language: '{{ settings.default_language }}',
+            appearance_mode: '{{ settings.appearance_mode }}',
+            remember_last_library: {{ 'true' if settings.remember_last_library else 'false' }},
+            subtitle_save_method: '{{ settings.subtitle_save_method }}',
+            prefer_hearing_impaired: {{ 'true' if settings.prefer_hearing_impaired else 'false' }},
+            prefer_forced: {{ 'true' if settings.prefer_forced else 'false' }},
+            default_providers: '{{ settings.default_providers }}',
+            search_timeout: {{ settings.search_timeout }},
+            default_subtitle_filter: '{{ settings.default_subtitle_filter }}',
+            confirm_batch_operations: {{ 'true' if settings.confirm_batch_operations else 'false' }},
+            batch_operation_threshold: {{ settings.batch_operation_threshold }},
+            concurrent_downloads: {{ settings.concurrent_downloads }},
+            enable_debug_logging: {{ 'true' if settings.enable_debug_logging else 'false' }},
+        },
+
+        async saveSettings() {
+            const resp = await fetch('/settings', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(this.s)
+            });
+            if (resp.ok) {
+                // Close modal via Alpine
+                const appEl = document.querySelector('[x-data="appState()"]');
+                if (appEl && appEl.__x) {
+                    appEl.__x.$data.showSettings = false;
+                }
+            }
+        },
+
+        async resetDefaults() {
+            if (confirm('Reset all settings to defaults?')) {
+                await fetch('/settings/reset', { method: 'POST' });
+                window.location.reload();
+            }
+        }
+    }
+}
+</script>

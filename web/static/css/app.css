@@ -1,0 +1,117 @@
+/* PlexSubSetter Web - Custom Styles */
+
+/* Plex gold accent */
+:root {
+    --plex-gold: #e5a00d;
+    --plex-gold-hover: #cc8f0c;
+}
+
+/* Hide htmx indicators by default */
+.htmx-indicator {
+    display: none;
+}
+.htmx-request .htmx-indicator {
+    display: flex;
+}
+.htmx-request.htmx-indicator {
+    display: flex;
+}
+
+/* Dark scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #1a1a2e;
+}
+::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Firefox scrollbar */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #333 #1a1a2e;
+}
+
+/* Checkbox styling overrides */
+input[type="checkbox"],
+input[type="radio"] {
+    accent-color: var(--plex-gold);
+}
+
+/* Tree hierarchy indentation */
+.seasons-container {
+    border-left: 2px solid #333;
+    margin-left: 12px;
+}
+.episodes-container {
+    border-left: 2px solid #2a2a3e;
+    margin-left: 12px;
+}
+
+/* Progress bar animation */
+@keyframes progress-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+.progress-pulse {
+    animation: progress-pulse 1.5s ease-in-out infinite;
+}
+
+/* Browser item hover */
+.browser-item {
+    transition: background-color 0.1s ease;
+}
+
+/* Smooth page transitions */
+#browser-items,
+#info-panel {
+    transition: opacity 0.15s ease;
+}
+
+/* Alpine cloak */
+[x-cloak] {
+    display: none !important;
+}
+
+/* Prevent body scroll when modal open */
+body.modal-open {
+    overflow: hidden;
+}
+
+/* Selection highlight */
+input[type="checkbox"]:checked + span {
+    color: var(--plex-gold);
+}
+
+/* Focus styles */
+select:focus,
+input:focus {
+    outline: none;
+    border-color: var(--plex-gold) !important;
+    box-shadow: 0 0 0 1px var(--plex-gold);
+}
+
+/* Button disabled state */
+button:disabled {
+    cursor: not-allowed;
+}
+
+/* Expand/collapse chevron */
+.expand-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    transition: transform 0.15s ease;
+}
+.expand-btn[data-expanded="true"] {
+    transform: rotate(90deg);
+}

@@ -1,0 +1,91 @@
+{% if items %}
+<div class="space-y-1">
+    {% for item in items %}
+    {% if is_movie %}
+    {# Movie item #}
+    <div class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-800/60 group browser-item"
+         data-key="{{ item.ratingKey }}">
+        <input type="checkbox"
+               class="item-checkbox rounded border-gray-600 bg-gray-800 text-plex-gold focus:ring-plex-gold"
+               data-key="{{ item.ratingKey }}"
+               {% if item.ratingKey in selected_keys %}checked{% endif %}
+               onchange="window.toggleItem(this)">
+        <span class="flex-1 text-sm truncate">
+            {{ item.title }}{% if item.year %} ({{ item.year }}){% endif %}
+        </span>
+        {% if item.ratingKey in subtitle_cache %}
+            {% if subtitle_cache[item.ratingKey] %}
+            <span class="text-green-500 font-bold text-xs" title="Has subtitles">&#10003;</span>
+            {% else %}
+            <span class="text-red-500 text-xs" title="No subtitles">&#10007;</span>
+            {% endif %}
+        {% else %}
+        <span class="text-gray-600 text-xs">...</span>
+        {% endif %}
+    </div>
+    {% else %}
+    {# Show item (expandable) #}
+    <div class="rounded bg-gray-800/40" data-key="{{ item.ratingKey }}">
+        <div class="flex items-center gap-2 px-3 py-2 hover:bg-gray-800/60 cursor-pointer">
+            <button class="text-gray-400 hover:text-gray-200 expand-btn"
+                    onclick="window.toggleShow(this, '{{ library_name }}', {{ item.ratingKey }})"
+                    data-expanded="false"><svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M3 1l5 4-5 4V1z"/></svg></button>
+            <input type="checkbox"
+                   class="show-checkbox rounded border-gray-600 bg-gray-800 text-plex-gold focus:ring-plex-gold"
+                   data-key="{{ item.ratingKey }}"
+                   data-show-name="{{ item.title }}"
+                   onchange="window.toggleShowSelect(this, '{{ library_name }}', {{ item.ratingKey }})">
+            <span class="flex-1 text-sm font-semibold truncate">
+                {{ item.title }}{% if item.year %} ({{ item.year }}){% endif %}
+            </span>
+        </div>
+        <div class="seasons-container hidden pl-6"></div>
+    </div>
+    {% endif %}
+    {% endfor %}
+</div>
+
+{# Pagination #}
+<div id="pagination" class="flex items-center justify-between px-2 py-2">
+    {% if total_pages > 1 %}
+    <button onclick="window.changePage({{ page - 1 }})" {% if page <= 1 %}disabled{% endif %}
+            class="text-xs px-3 py-1 rounded border border-gray-700 text-gray-300 hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed">
+        &lsaquo; Prev
+    </button>
+    <span class="text-xs text-gray-500">Page {{ page }} of {{ total_pages }} ({{ start }}-{{ end }} of {{ total_items }})</span>
+    <button onclick="window.changePage({{ page + 1 }})" {% if page >= total_pages %}disabled{% endif %}
+            class="text-xs px-3 py-1 rounded border border-gray-700 text-gray-300 hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed">
+        Next &rsaquo;
+    </button>
+    {% else %}
+    <span class="text-xs text-gray-500 w-full text-center">{{ total_items }} item{{ 's' if total_items != 1 }} total</span>
+    {% endif %}
+</div>
+
+{% if search %}
+<script>
+    // Update filter status in Alpine
+    document.querySelector('[x-data]').__x.$data.filterStatus = 'Showing {{ filtered_count }}/{{ unfiltered_count }} matching "{{ search }}"';
+</script>
+{% elif subtitle_filter != 'all' %}
+<script>
+    document.querySelector('[x-data]').__x.$data.filterStatus = 'Showing {{ filtered_count }}/{{ unfiltered_count }} {{ "without" if subtitle_filter == "missing" else "with" }} subtitles';
+</script>
+{% else %}
+<script>
+    if (document.querySelector('[x-data]').__x) {
+        document.querySelector('[x-data]').__x.$data.filterStatus = '';
+    }
+</script>
+{% endif %}
+
+{% else %}
+<div class="text-gray-500 text-sm text-center py-8">
+    {% if search %}
+    No items matching "{{ search }}"
+    {% else %}
+    No items found
+    {% endif %}
+</div>
+<div id="pagination"></div>
+{% endif %}

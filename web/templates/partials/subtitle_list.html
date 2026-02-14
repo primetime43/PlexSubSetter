@@ -1,0 +1,31 @@
+{% if items %}
+<div class="space-y-4">
+    <h3 class="text-lg font-bold">&#128196; Current Subtitles</h3>
+
+    {% for item in items %}
+    <div class="bg-gray-800 rounded-lg p-4">
+        <p class="font-bold text-sm mb-2">{{ item.title }}</p>
+        {% for stream in item.streams %}
+        <div class="flex items-center gap-2 text-sm py-1">
+            {% if stream.selected %}
+            <span class="text-green-400">&#10003;</span>
+            {% else %}
+            <span class="text-gray-600">&nbsp;&nbsp;</span>
+            {% endif %}
+            <span>{{ stream.language }} ({{ stream.codec }})</span>
+            {% if stream.forced %}
+            <span class="text-xs bg-yellow-900/40 text-yellow-400 px-1.5 rounded">FORCED</span>
+            {% endif %}
+            {% if stream.sdh %}
+            <span class="text-xs bg-blue-900/40 text-blue-400 px-1.5 rounded">SDH</span>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-gray-400 text-sm text-center py-8">
+    No subtitle streams found for selected items.
+</div>
+{% endif %}

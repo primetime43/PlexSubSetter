@@ -2,7 +2,7 @@
 
 Stop going episode by episode to set subtitles in Plex! PlexSubSetter lets you search, download, and manage subtitles for entire seasons, shows, or your whole movie library at once. This will allow you to set the subtitles easily.
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 
@@ -26,10 +26,7 @@ Whether you're missing subtitles on a few episodes or want to add them to your e
 - **Preview Before Download** - See what subtitles are available before downloading
 - **Manage Existing Subtitles** - View, activate, or delete subtitle streams
 - **Multi-Language Support** - Download subtitles in any language
-
-v1.0.0
-  <img width="1202" height="882" alt="image" src="https://github.com/user-attachments/assets/20ca72a8-eb67-488a-955d-96b16dd087ca" />
-
+- **Web-Based UI** - Runs in your browser with a dark-themed modern interface
 
 ## Installation
 
@@ -46,13 +43,11 @@ pip install -r requirements.txt
 
 **Required packages:**
 - `plexapi>=4.15.0` - Plex API client
-- `customtkinter>=5.2.0` - Modern GUI framework
+- `flask>=3.0` - Web framework
 - `subliminal>=2.1.0` - Subtitle search and download
 - `babelfish>=0.6.0` - Language handling
 
 ## Quick Start
-
-### GUI Mode (Recommended)
 
 **Windows:**
 ```batch
@@ -60,7 +55,7 @@ run_gui.bat
 ```
 or
 ```bash
-python plex_subsetter_gui.py
+python app.py
 ```
 
 **Linux/Mac:**
@@ -69,14 +64,16 @@ python plex_subsetter_gui.py
 ```
 or
 ```bash
-python3 plex_subsetter_gui.py
+python3 app.py
 ```
+
+The app starts a local web server on `http://localhost:5000` and opens your browser automatically.
 
 ## Configuration
 
 PlexSubSetter stores all your settings in a `config.ini` file in the application directory. You can change settings two ways:
 
-1. **Through the GUI** - Click the ⚙ Settings button (easy, recommended)
+1. **Through the web UI** - Click the Settings button (easy, recommended)
 2. **Edit config.ini directly** - For advanced users or automation
 
 All settings are saved automatically and persist between sessions. No need to reconfigure every time you open the app!
@@ -88,7 +85,6 @@ All settings are saved automatically and persist between sessions. No need to re
 [General]
 subtitle_save_method = plex        # "plex" or "file"
 default_language = English         # Default subtitle language
-appearance_mode = dark             # "dark", "light", or "system"
 remember_last_library = True       # Remember last selected library
 last_library =                     # Auto-populated
 ```
@@ -105,7 +101,6 @@ search_timeout = 30                # Search timeout in seconds
 #### UI/Behavior
 ```ini
 [UI]
-show_log_on_startup = False        # Show log panel on startup
 default_subtitle_filter = all      # "all", "missing", or "has"
 confirm_batch_operations = True    # Confirm large batch operations
 batch_operation_threshold = 10     # Items count for confirmation
@@ -129,69 +124,93 @@ You can choose how PlexSubSetter saves downloaded subtitles:
 ## How to Use
 
 ### First Time Setup
-1. Run the app and click "Sign in with Plex"
-2. Your browser opens - log in to Plex and authorize the app
-3. Choose your Plex server from the list (it picks the best connection automatically)
-4. Select a library (Movies, TV Shows, etc.)
+1. Run `python app.py` - your browser opens automatically
+2. Click "Sign in with Plex" - a new tab opens for Plex authentication
+3. Authorize the app on Plex.tv
+4. Choose your Plex server from the list (it picks the best connection automatically)
+5. Select a library (Movies, TV Shows, etc.)
 
 ### Finding and Downloading Subtitles
 
 **For entire seasons or shows:**
-1. Click the ▼ arrow to expand a show
+1. Click the arrow to expand a show
 2. Check the box next to season(s) or individual episodes
-3. Click "🔍 Search Available" to see what subtitles are available
-4. Click "⬇ Download Selected" to download them all at once
+3. Click "Search Available" to see what subtitles are available
+4. Click "Download Selected Subtitles" to download them all at once
 
 **For movies:**
 1. Use the **Missing** button to see only movies without subtitles
 2. Click "Select All" to select everything, or check individual movies
-3. Click "🔍 Search Available" then "⬇ Download Selected"
+3. Click "Search Available" then "Download Selected Subtitles"
 
 **Quick search:** Type in the search box at the top to filter by title
 
 ### Other Useful Features
 
 - **List Current** - See what subtitle streams are already on selected items
+- **Dry Run** - Preview which items have subtitles available without downloading
 - **Delete** - Remove subtitle streams you don't want
-- **Settings (⚙)** - Change language, providers, and other options
+- **Settings** - Change language, providers, and other options
 - **All/Missing/Has Subs buttons** - Quickly filter your library by subtitle status
-- **Reload Library (🔄)** - Refresh the view after making changes in Plex
+- **Reload Library** - Refresh the view after making changes in Plex
 
 ## Architecture
 
-PlexSubSetter uses a modular architecture with clear separation of concerns:
+PlexSubSetter uses a web-based architecture with Flask backend and htmx + Alpine.js frontend:
 
 ```
 PlexSubSetter/
-├── plex_subsetter_gui.py          # GUI entry point
+├── app.py                         # Flask entry point
 ├── plex_subsetter.py              # CLI entry point
-├── ui/                            # GUI modules
-│   ├── main_app_frame.py          # Main application UI
-│   ├── login_frame.py             # OAuth authentication
-│   ├── server_selection_frame.py  # Server selection UI
-│   ├── library_browser.py         # Library browsing & selection
-│   ├── subtitle_operations.py     # Subtitle operations logic
-│   └── settings_dialog.py         # Settings UI
+├── core/                          # Business logic (no UI)
+│   ├── session_state.py           # In-memory session state
+│   ├── task_manager.py            # Background tasks + SSE
+│   ├── auth_service.py            # Plex OAuth
+│   ├── server_service.py          # Server discovery/connection
+│   ├── library_service.py         # Library browsing
+│   └── subtitle_service.py        # Subtitle operations
+├── web/                           # Flask web application
+│   ├── __init__.py                # App factory
+│   ├── routes/                    # Route blueprints
+│   │   ├── auth.py                # Authentication routes
+│   │   ├── servers.py             # Server selection
+│   │   ├── libraries.py           # Library browsing
+│   │   ├── subtitles.py           # Subtitle operations
+│   │   ├── settings.py            # Settings management
+│   │   ├── events.py              # SSE endpoint
+│   │   └── logs.py                # Log viewer
+│   ├── templates/                 # Jinja2 templates
+│   │   ├── base.html              # Base layout
+│   │   ├── login.html             # Login page
+│   │   ├── servers.html           # Server selection
+│   │   ├── app.html               # Main app (two-column)
+│   │   └── partials/              # htmx partial templates
+│   └── static/                    # CSS and JavaScript
 ├── utils/                         # Utility modules
 │   ├── config_manager.py          # Configuration management
-│   └── constants.py               # Shared constants
+│   ├── constants.py               # Shared constants
+│   ├── logging_config.py          # Logging setup
+│   └── security.py                # Security utilities
 ├── error_handling.py              # Error handling & logging
 └── config.ini                     # User configuration
 ```
 
 ### Key Design Patterns
-- **Frame State Machine**: Three main states (Login → Server Selection → Main App)
-- **Thread Safety**: All long-running operations run in background threads with safe UI updates
+- **Service Layer**: All business logic in `core/` with no UI dependencies
+- **SSE (Server-Sent Events)**: Real-time progress updates from background tasks
+- **htmx**: Server-rendered HTML partials for dynamic content
+- **Alpine.js**: Lightweight reactive state for UI interactions
+- **Background Tasks**: Long operations run in threads, push events via SSE
 - **Lazy Loading**: Shows/seasons expand on demand for performance
 - **Caching**: Subtitle status cached to prevent redundant API calls
-- **Delegation**: MainAppFrame delegates to SubtitleOperations and LibraryBrowser classes
 
 ## Troubleshooting
 
-### GUI won't start
+### App won't start
 - Ensure Python 3.8+ is installed: `python --version`
 - Install dependencies: `pip install -r requirements.txt`
 - Check logs in `logs/` directory
+- Make sure port 5000 is available
 
 ### Can't find subtitles
 - Verify internet connection
@@ -206,25 +225,9 @@ PlexSubSetter/
 - Check Plex token validity
 
 ### Subtitle indicators not updating
-- Click "🔄 Reload Library" to refresh
+- Click "Reload Library" to refresh
 - Check that items have been reloaded from server
 - Verify subtitle streams are actually present in Plex
-
-### Running from Source
-```bash
-# GUI mode
-python plex_subsetter_gui.py
-```
-
-### Building Executable
-```bash
-# Windows
-build_exe.bat
-
-# Linux/Mac
-./build_exe.sh
-```
-
 
 ## License
 

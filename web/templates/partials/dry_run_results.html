@@ -1,0 +1,53 @@
+<div class="space-y-4">
+    <h3 class="text-lg font-bold">&#128065; Dry Run Preview</h3>
+
+    <!-- Summary -->
+    <div class="bg-gray-800 rounded-lg p-4 space-y-1 text-sm">
+        <p>&#9989; Already have subtitles: <strong>{{ already_have|length }}</strong></p>
+        <p>&#128229; Subtitles available: <strong>{{ available|length }}</strong></p>
+        <p>&#10060; No subtitles found: <strong>{{ not_available|length }}</strong></p>
+        {% if errors %}
+        <p>&#9888;&#65039; Errors: <strong>{{ errors|length }}</strong></p>
+        {% endif %}
+    </div>
+
+    <!-- Available -->
+    {% if available %}
+    <div>
+        <h4 class="text-sm font-bold text-green-400 mb-2">&#128229; Subtitles Available</h4>
+        {% for item in available %}
+        <p class="text-sm text-gray-300 py-0.5 pl-4">&#8226; {{ item.title }} ({{ item.count }} options)</p>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Already have -->
+    {% if already_have %}
+    <div>
+        <h4 class="text-sm font-bold text-blue-400 mb-2">&#9989; Already Have Subtitles</h4>
+        {% for item in already_have %}
+        <p class="text-sm text-gray-500 py-0.5 pl-4">&#8226; {{ item.title }}</p>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Not available -->
+    {% if not_available %}
+    <div>
+        <h4 class="text-sm font-bold text-red-400 mb-2">&#10060; No Subtitles Found</h4>
+        {% for item in not_available %}
+        <p class="text-sm text-gray-500 py-0.5 pl-4">&#8226; {{ item.title }}</p>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Errors -->
+    {% if errors %}
+    <div>
+        <h4 class="text-sm font-bold text-yellow-400 mb-2">&#9888;&#65039; Errors</h4>
+        {% for item in errors %}
+        <p class="text-sm text-gray-500 py-0.5 pl-4">&#8226; {{ item.title }}: {{ item.error }}</p>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>

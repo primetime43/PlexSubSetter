@@ -1,0 +1,26 @@
+{% for ep in episodes %}
+<div class="flex items-center gap-2 px-3 py-1 hover:bg-gray-800/40 browser-item"
+     data-key="{{ ep.ratingKey }}">
+    <input type="checkbox"
+           class="item-checkbox rounded border-gray-600 bg-gray-800 text-plex-gold focus:ring-plex-gold"
+           data-key="{{ ep.ratingKey }}"
+           {% if ep.ratingKey in selected_keys %}checked{% endif %}
+           onchange="window.toggleItem(this)">
+    <span class="flex-1 text-xs truncate text-gray-300">
+        E{{ '%02d' % ep.index }} - {{ ep.title }}
+    </span>
+    {% if ep.ratingKey in subtitle_cache %}
+        {% if subtitle_cache[ep.ratingKey] %}
+        <span class="text-green-500 font-bold text-xs">&#10003;</span>
+        {% else %}
+        <span class="text-red-500 text-xs">&#10007;</span>
+        {% endif %}
+    {% else %}
+    <span class="text-gray-600 text-xs">...</span>
+    {% endif %}
+</div>
+{% endfor %}
+
+{% if not episodes %}
+<div class="text-gray-500 text-xs text-center py-1">No episodes found</div>
+{% endif %}

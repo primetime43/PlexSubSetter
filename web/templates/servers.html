@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title_suffix %} - Select Server{% endblock %}
+
+{% block body %}
+<div class="min-h-screen max-w-3xl mx-auto px-6 py-8">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold">Welcome, {{ username }}!</h1>
+            <p class="text-gray-400 text-sm">Select a server connection to manage subtitles</p>
+        </div>
+        <form action="/auth/logout" method="post">
+            <button type="submit" class="px-4 py-2 border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-800 text-sm">
+                Logout
+            </button>
+        </form>
+    </div>
+
+    <!-- Server list (loaded via htmx) -->
+    <div class="space-y-4">
+        <h2 class="text-lg font-semibold text-gray-300">Available Servers</h2>
+        <div
+            hx-get="/servers/list"
+            hx-trigger="load"
+            hx-indicator="#server-loading"
+        >
+            <div id="server-loading" class="htmx-indicator flex items-center justify-center py-12">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-plex-gold mr-3"></div>
+                <span class="text-gray-400">Loading servers...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Connection status -->
+    <div id="connect-status" class="mt-4"></div>
+</div>
+{% endblock %}

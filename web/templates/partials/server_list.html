@@ -1,0 +1,69 @@
+{% for server in servers %}
+<div class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden mb-4">
+    <!-- Server header -->
+    <div class="p-4">
+        <div class="flex items-center justify-between mb-2">
+            <h3 class="text-lg font-bold">{{ server.name }}</h3>
+            {% if server.presence %}
+            <span class="text-green-400 text-sm">&#9679; Online</span>
+            {% else %}
+            <span class="text-red-400 text-sm">&#9679; Offline</span>
+            {% endif %}
+        </div>
+        <p class="text-gray-500 text-xs">Platform: {{ server.platform }} | Version: {{ server.platform_version }}</p>
+    </div>
+
+    <!-- Connections -->
+    <div class="px-4 pb-4 space-y-2">
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Available Connections</p>
+        {% for conn in server.connections %}
+        <form hx-post="/servers/connect" hx-target="#connect-status" hx-indicator="#connect-loading-{{ loop.index0 }}">
+            <input type="hidden" name="server_name" value="{{ server.name }}">
+            <input type="hidden" name="connection_uri" value="{{ conn.uri }}">
+            <button type="submit"
+                    class="w-full text-left rounded-lg px-4 py-3 text-sm transition-colors
+                    {% if conn.is_best %}
+                        bg-green-900/40 border border-green-700 hover:bg-green-900/60 font-bold
+                    {% else %}
+                        bg-gray-800 border border-gray-700 hover:bg-gray-750
+                    {% endif %}">
+                <div class="flex items-center gap-2 flex-wrap">
+                    {% if conn.is_best %}
+                    <span class="text-yellow-400">&#11088; RECOMMENDED</span>
+                    <span class="text-gray-600">|</span>
+                    {% endif %}
+                    {% if conn.truly_local %}
+                    <span>&#127968; Local</span>
+                    <span class="text-gray-500 text-xs">(Same Network)</span>
+                    {% elif conn.local %}
+                    <span>&#127968; Local</span>
+                    <span class="text-gray-500 text-xs">(Not Accessible)</span>
+                    {% else %}
+                    <span>&#127760; Remote</span>
+                    {% endif %}
+                    <span class="text-gray-600">|</span>
+                    {% if conn.is_https %}
+                    <span class="text-green-500">&#128274;</span>
+                    {% else %}
+                    <span class="text-yellow-500">&#128275;</span>
+                    {% endif %}
+                    <span class="text-gray-300">{{ conn.display_addr }}</span>
+                </div>
+                <div id="connect-loading-{{ loop.index0 }}" class="htmx-indicator mt-2">
+                    <div class="flex items-center gap-2 text-plex-gold text-xs">
+                        <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-plex-gold"></div>
+                        Connecting...
+                    </div>
+                </div>
+            </button>
+        </form>
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}
+
+{% if not servers %}
+<div class="text-center py-12 text-gray-400">
+    <p>No servers found on your account.</p>
+</div>
+{% endif %}

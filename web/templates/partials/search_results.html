@@ -1,0 +1,32 @@
+<div class="space-y-4">
+    <h3 class="text-lg font-bold">&#128221; Select Subtitles to Download</h3>
+
+    {% for item in items %}
+    <div class="bg-gray-800 rounded-lg p-4 space-y-2">
+        <p class="font-bold text-sm">{{ item.title }}</p>
+        <p class="text-xs text-gray-500">{{ item.total_count }} subtitle(s) found</p>
+
+        <!-- Skip option (default) -->
+        <label class="flex items-center gap-2 text-sm text-gray-500 py-1 cursor-pointer">
+            <input type="radio" name="sub-{{ item.rating_key }}" value="-1" checked
+                   class="text-plex-gold focus:ring-plex-gold border-gray-600 bg-gray-900"
+                   onchange="window.setSubSelection({{ item.rating_key }}, -1)">
+            &#8855; Skip - Don't download
+        </label>
+
+        {% for sub in item.subtitles %}
+        <label class="flex items-center gap-2 text-sm text-gray-300 py-1 cursor-pointer hover:text-white">
+            <input type="radio" name="sub-{{ item.rating_key }}" value="{{ sub.index }}"
+                   class="text-plex-gold focus:ring-plex-gold border-gray-600 bg-gray-900"
+                   onchange="window.setSubSelection({{ item.rating_key }}, {{ sub.index }})">
+            <span class="text-plex-gold text-xs">[{{ sub.provider }}]</span>
+            {{ sub.release_info }}
+        </label>
+        {% endfor %}
+
+        {% if item.total_count > item.subtitles|length %}
+        <p class="text-xs text-gray-500 pl-6">...and {{ item.total_count - item.subtitles|length }} more</p>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
