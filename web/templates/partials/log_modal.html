@@ -7,9 +7,15 @@
         <button @click="showLogs = false" class="text-gray-400 hover:text-white text-xl">&times;</button>
     </div>
 
-    <div class="bg-gray-950 border border-gray-800 rounded-lg p-4 max-h-96 overflow-y-auto font-mono text-xs leading-relaxed text-gray-300 whitespace-pre-wrap">{{ log_content if log_content else 'No log content available.' }}</div>
+    <div id="log-content-area" class="bg-gray-950 border border-gray-800 rounded-lg p-4 max-h-96 overflow-y-auto font-mono text-xs leading-relaxed text-gray-300 whitespace-pre-wrap">{{ log_content if log_content else 'No log content available.' }}</div>
 
-    <div class="flex justify-end">
+    <div class="flex justify-between items-center">
+        <span class="text-xs text-gray-600">Auto-refreshes every 3s</span>
         <button @click="showLogs = false" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm">Close</button>
     </div>
 </div>
+<script>
+    // Auto-scroll to bottom on each refresh
+    var logArea = document.getElementById('log-content-area');
+    if (logArea) { logArea.scrollTop = logArea.scrollHeight; }
+</script>

@@ -180,7 +180,7 @@
     <!-- Logs Modal -->
     <div x-show="showLogs" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" @keydown.escape.window="showLogs = false">
         <div class="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-3xl max-h-[85vh] overflow-y-auto shadow-2xl" @click.away="showLogs = false">
-            <div class="p-6" hx-get="/logs" hx-trigger="intersect once" hx-swap="innerHTML">
+            <div class="p-6" id="log-modal-content">
                 <div class="text-center py-8 text-gray-400">Loading logs...</div>
             </div>
         </div>

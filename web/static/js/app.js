@@ -40,11 +40,36 @@ function appState() {
         progressText: '',
         hasSearchResults: false,
 
+        // Log refresh
+        _logInterval: null,
+
         init() {
             // Load libraries on init
             this.loadLibraries();
 
-            // Future: watch for state changes if needed
+            // Auto-refresh logs while modal is open
+            this.$watch('showLogs', (open) => {
+                if (open) {
+                    this._refreshLogs();
+                    this._logInterval = setInterval(() => this._refreshLogs(), 3000);
+                } else if (this._logInterval) {
+                    clearInterval(this._logInterval);
+                    this._logInterval = null;
+                }
+            });
+        },
+
+        async _refreshLogs() {
+            const container = document.getElementById('log-modal-content');
+            if (!container) return;
+            try {
+                const resp = await fetch('/logs');
+                if (resp.ok) {
+                    container.innerHTML = await resp.text();
+                }
+            } catch (e) {
+                // silently fail — modal may have closed
+            }
         },
 
         async loadLibraries() {
