@@ -26,12 +26,14 @@ from core.library_service import get_item_title
 def _make_video_object(item):
     """Create a subliminal Video object from a Plex item."""
     if isinstance(item, Episode):
-        fake_name = f"{item.grandparentTitle}.S{item.seasonNumber:02d}E{item.index:02d}.mkv"
+        ep_num = item.index if item.index is not None else 0
+        season_num = item.seasonNumber if item.seasonNumber is not None else 0
+        fake_name = f"{item.grandparentTitle}.S{season_num:02d}E{ep_num:02d}.mkv"
         video = SubliminalEpisode(
             name=fake_name,
             series=item.grandparentTitle,
-            season=item.seasonNumber,
-            episodes=item.index,
+            season=season_num,
+            episodes=ep_num,
         )
         video.title = item.title
         if hasattr(item, 'year') and item.year:
@@ -47,7 +49,7 @@ def _make_video_object(item):
     return video
 
 
-def search(items, language_name, providers, task_manager=None):
+def search(items, language_name, providers, task_manager=None, timeout=None):
     """
     Search for available subtitles.
 
@@ -56,13 +58,22 @@ def search(items, language_name, providers, task_manager=None):
         language_name: Language display name (e.g. "English")
         providers: Comma-separated provider string
         task_manager: Optional TaskManager for progress events
+        timeout: Optional search timeout in seconds per provider
 
     Returns:
         dict: {rating_key: {title, subtitles: [{provider, release_info, index}]}}
     """
     language_code = SEARCH_LANGUAGES.get(language_name, 'en')
     lang = Language.fromalpha2(language_code)
+    if not providers:
+        providers = 'opensubtitles,podnapisi'
     provider_list = [p.strip() for p in providers.split(',') if p.strip()]
+
+    # Build provider configs with timeout if specified
+    provider_configs = {}
+    if timeout:
+        for p in provider_list:
+            provider_configs[p] = {'timeout': timeout}
 
     results = {}
     total = len(items)
@@ -81,7 +92,10 @@ def search(items, language_name, providers, task_manager=None):
 
         try:
             video = _make_video_object(item)
-            subtitles = list_subtitles({video}, languages={lang}, providers=provider_list)
+            kwargs = {'providers': provider_list}
+            if provider_configs:
+                kwargs['provider_configs'] = provider_configs
+            subtitles = list_subtitles({video}, languages={lang}, **kwargs)
             subs_list = list(subtitles.get(video, []))
 
             if subs_list:
@@ -190,25 +204,26 @@ def download(items, search_results, selections, language_name, save_method, task
                     task_manager.emit('log', {'message': f"Error: {e}", 'level': 'error'})
                 continue
 
-            with open(subtitle_path, 'wb') as f:
-                f.write(selected_sub.content)
-
-            if save_method == 'file':
-                _save_to_file(item, subtitle_path, language_code, task_manager)
-            else:
-                item.uploadSubtitles(subtitle_path)
-
-            # Clean up temp file
             try:
-                os.remove(subtitle_path)
-            except (OSError, PermissionError) as cleanup_error:
-                logging.debug(f"Could not delete temp file: {cleanup_error}")
+                with open(subtitle_path, 'wb') as f:
+                    f.write(selected_sub.content)
 
-            success_count += 1
-            successful_keys.append(rating_key)
+                if save_method == 'file':
+                    _save_to_file(item, subtitle_path, language_code, task_manager)
+                else:
+                    item.uploadSubtitles(subtitle_path)
 
-            if task_manager:
-                task_manager.emit('log', {'message': f"Successfully downloaded subtitle for: {title}"})
+                success_count += 1
+                successful_keys.append(rating_key)
+
+                if task_manager:
+                    task_manager.emit('log', {'message': f"Successfully downloaded subtitle for: {title}"})
+            finally:
+                # Always clean up temp file
+                try:
+                    os.remove(subtitle_path)
+                except (OSError, PermissionError) as cleanup_error:
+                    logging.debug(f"Could not delete temp file: {cleanup_error}")
 
         except Exception as e:
             logging.error(f"Error downloading subtitle for {title}: {e}")
@@ -267,7 +282,7 @@ def _save_to_file(item, subtitle_path, language_code, task_manager=None):
         item.uploadSubtitles(subtitle_path)
 
 
-def dry_run(items, language_name, providers, task_manager=None):
+def dry_run(items, language_name, providers, task_manager=None, timeout=None):
     """
     Preview subtitle availability without downloading.
 
@@ -276,7 +291,15 @@ def dry_run(items, language_name, providers, task_manager=None):
     """
     language_code = SEARCH_LANGUAGES.get(language_name, 'en')
     lang = Language.fromalpha2(language_code)
+    if not providers:
+        providers = 'opensubtitles,podnapisi'
     provider_list = [p.strip() for p in providers.split(',') if p.strip()]
+
+    # Build provider configs with timeout if specified
+    provider_configs = {}
+    if timeout:
+        for p in provider_list:
+            provider_configs[p] = {'timeout': timeout}
 
     already_have = []
     available = []
@@ -314,7 +337,10 @@ def dry_run(items, language_name, providers, task_manager=None):
                 continue
 
             video = _make_video_object(item)
-            subtitles = list_subtitles({video}, languages={lang}, providers=provider_list)
+            kwargs = {'providers': provider_list}
+            if provider_configs:
+                kwargs['provider_configs'] = provider_configs
+            subtitles = list_subtitles({video}, languages={lang}, **kwargs)
             count = len(list(subtitles.get(video, [])))
 
             if count > 0:

@@ -23,11 +23,12 @@ def search_subtitles():
 
     language = request.json.get('language', settings.get('default_language', 'English'))
     providers = request.json.get('providers', settings.get('default_providers', 'opensubtitles,podnapisi'))
+    timeout = settings.get('search_timeout', 30)
 
     items = list(state.selected_items)
 
     def do_search():
-        results = subtitle_service.search(items, language, providers, tm)
+        results = subtitle_service.search(items, language, providers, tm, timeout=timeout)
         # Store results in state for download
         state.search_results = results
         return results
@@ -108,11 +109,12 @@ def dry_run():
 
     language = request.json.get('language', settings.get('default_language', 'English'))
     providers = request.json.get('providers', settings.get('default_providers', 'opensubtitles,podnapisi'))
+    timeout = settings.get('search_timeout', 30)
 
     items = list(state.selected_items)
 
     def do_dry_run():
-        return subtitle_service.dry_run(items, language, providers, tm)
+        return subtitle_service.dry_run(items, language, providers, tm, timeout=timeout)
 
     task_id = tm.submit('dry_run', do_dry_run)
     return jsonify({'task_id': task_id, 'item_count': len(items)})

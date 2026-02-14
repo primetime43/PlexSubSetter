@@ -1,7 +1,7 @@
 <div x-data="settingsPanel()" class="space-y-6">
     <div class="flex items-center justify-between">
         <h2 class="text-xl font-bold">&#9881; Settings</h2>
-        <button @click="$dispatch('close-settings'); showSettings = false" class="text-gray-400 hover:text-white text-xl">&times;</button>
+        <button @click="$dispatch('close-settings')" class="text-gray-400 hover:text-white text-xl">&times;</button>
     </div>
 
     <!-- Tabs -->
@@ -123,7 +123,7 @@
     <div class="flex justify-between pt-4 border-t border-gray-700">
         <button @click="resetDefaults()" class="px-4 py-2 border border-gray-600 rounded text-sm text-gray-300 hover:bg-gray-800">Reset to Defaults</button>
         <div class="flex gap-2">
-            <button @click="showSettings = false" class="px-4 py-2 border border-gray-600 rounded text-sm text-gray-300 hover:bg-gray-800">Cancel</button>
+            <button @click="$dispatch('close-settings')" class="px-4 py-2 border border-gray-600 rounded text-sm text-gray-300 hover:bg-gray-800">Cancel</button>
             <button @click="saveSettings()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm font-medium">Save Settings</button>
         </div>
     </div>
@@ -156,11 +156,7 @@ function settingsPanel() {
                 body: JSON.stringify(this.s)
             });
             if (resp.ok) {
-                // Close modal via Alpine
-                const appEl = document.querySelector('[x-data]');
-                if (appEl) {
-                    Alpine.$data(appEl).showSettings = false;
-                }
+                this.$dispatch('close-settings');
             }
         },
 

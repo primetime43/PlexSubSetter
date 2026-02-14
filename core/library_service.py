@@ -138,7 +138,7 @@ def check_subtitle_status(item, force_refresh=False, skip_reload=False):
         try:
             item.reload()
         except Exception as e:
-            logging.debug(f"Error reloading item for subtitle check: {e}")
+            logging.warning(f"Error reloading item for subtitle check: {e}")
 
     try:
         for media in item.media:
@@ -147,7 +147,7 @@ def check_subtitle_status(item, force_refresh=False, skip_reload=False):
                     return True
         return False
     except (AttributeError, RuntimeError, Exception) as e:
-        logging.debug(f"Error checking subtitle status: {e}")
+        logging.warning(f"Error checking subtitle status: {e}")
         return False
 
 
@@ -204,7 +204,7 @@ def batch_check_subtitles(items, state, task_manager=None):
             try:
                 f.result(timeout=120)
             except Exception as e:
-                logging.debug(f"Error in batch subtitle check: {e}")
+                logging.warning(f"Error in batch subtitle check: {e}")
 
     logging.info(f"Batch subtitle check complete: {checked}/{total}")
 
@@ -218,6 +218,8 @@ def get_item_title(item):
         year = f" ({item.year})" if hasattr(item, 'year') and item.year else ""
         return f"{item.title}{year}"
     elif isinstance(item, Episode):
-        return f"{item.grandparentTitle} S{item.seasonNumber:02d}E{item.index:02d} - {item.title}"
+        ep_num = item.index if item.index is not None else 0
+        season_num = item.seasonNumber if item.seasonNumber is not None else 0
+        return f"{item.grandparentTitle} S{season_num:02d}E{ep_num:02d} - {item.title}"
     else:
         return item.title

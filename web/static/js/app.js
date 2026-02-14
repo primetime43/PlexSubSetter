@@ -44,8 +44,7 @@ function appState() {
             // Load libraries on init
             this.loadLibraries();
 
-            // Listen for SSE events
-            this.$watch('operationRunning', () => {});
+            // Future: watch for state changes if needed
         },
 
         async loadLibraries() {
@@ -171,8 +170,16 @@ function appState() {
                     body: JSON.stringify({
                         language: this.language,
                         providers: this.provider,
+                        sdh: this.sdh,
+                        forced: this.forced,
                     })
                 });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({ error: 'Request failed' }));
+                    this._showInfoMessage(err.error || 'Search request failed', 'error');
+                    this.operationRunning = false;
+                    return;
+                }
                 const data = await resp.json();
                 if (data.error) {
                     this._showInfoMessage(data.error, 'error');
@@ -211,8 +218,16 @@ function appState() {
                     body: JSON.stringify({
                         language: this.language,
                         providers: this.provider,
+                        sdh: this.sdh,
+                        forced: this.forced,
                     })
                 });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({ error: 'Request failed' }));
+                    this._showInfoMessage(err.error || 'Dry run request failed', 'error');
+                    this.operationRunning = false;
+                    return;
+                }
                 const data = await resp.json();
                 if (data.error) {
                     this._showInfoMessage(data.error, 'error');
@@ -234,6 +249,12 @@ function appState() {
 
             try {
                 const resp = await fetch('/subtitles/delete', { method: 'POST' });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({ error: 'Request failed' }));
+                    this._showInfoMessage(err.error || 'Delete request failed', 'error');
+                    this.operationRunning = false;
+                    return;
+                }
                 const data = await resp.json();
                 if (data.error) {
                     this._showInfoMessage(data.error, 'error');
@@ -260,6 +281,12 @@ function appState() {
                         language: this.language,
                     })
                 });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({ error: 'Request failed' }));
+                    this._showInfoMessage(err.error || 'Download request failed', 'error');
+                    this.operationRunning = false;
+                    return;
+                }
                 const data = await resp.json();
                 if (data.error) {
                     this._showInfoMessage(data.error, 'error');

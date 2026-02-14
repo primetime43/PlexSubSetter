@@ -41,12 +41,12 @@ def update_settings():
         'prefer_hearing_impaired': data.get('prefer_hearing_impaired', False),
         'prefer_forced': data.get('prefer_forced', False),
         'default_providers': data.get('default_providers', 'opensubtitles,podnapisi'),
-        'search_timeout': int(data.get('search_timeout', 30)),
+        'search_timeout': max(MIN_SEARCH_TIMEOUT, min(MAX_SEARCH_TIMEOUT, int(data.get('search_timeout', 30)))),
         'show_log_on_startup': data.get('show_log_on_startup', False),
         'default_subtitle_filter': data.get('default_subtitle_filter', 'all'),
         'confirm_batch_operations': data.get('confirm_batch_operations', True),
-        'batch_operation_threshold': int(data.get('batch_operation_threshold', 10)),
-        'concurrent_downloads': int(data.get('concurrent_downloads', 3)),
+        'batch_operation_threshold': max(5, min(50, int(data.get('batch_operation_threshold', 10)))),
+        'concurrent_downloads': max(1, min(10, int(data.get('concurrent_downloads', 3)))),
         'enable_debug_logging': data.get('enable_debug_logging', False),
     }
 
