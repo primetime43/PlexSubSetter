@@ -4,7 +4,7 @@ Stop going episode by episode to set subtitles in Plex! PlexSubSetter lets you s
 
 ![Version](https://img.shields.io/badge/version-1.5.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
-![License](https://img.shields.io/badge/license-MIT-orange.svg)
+![License](https://img.shields.io/badge/license-GPL--3.0-orange.svg)
 
 ## Table of Contents
 - [Why I Built This](#why-i-built-this)
@@ -242,4 +242,4 @@ PlexSubSetter/
 
 ## License
 
-MIT License - See LICENSE file for details
+This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
