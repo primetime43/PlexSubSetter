@@ -38,7 +38,9 @@ def list_libraries():
         return jsonify({'error': 'Not connected'}), 401
 
     try:
-        libs = library_service.get_libraries(state.plex)
+        all_libs = library_service.get_libraries(state.plex)
+        # Only show movie and TV show libraries
+        libs = [l for l in all_libs if l['type'] in ('movie', 'show')]
         state.libraries = libs
         return jsonify(libs)
     except Exception as e:
