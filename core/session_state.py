@@ -35,7 +35,22 @@ class SessionState:
         with self._lock:
             self.plex = plex
 
+    def clear_server(self):
+        """Clear server connection and all related state, but keep account."""
+        with self._lock:
+            self.plex = None
+            self.selected_items.clear()
+            self.search_results.clear()
+            self.subtitle_status_cache.clear()
+            self.libraries.clear()
+            self.current_library = None
+            self.all_movies = None
+            self.all_shows = None
+            self.library_items_cache.clear()
+            self.subtitle_selections.clear()
+
     def clear_auth(self):
+        """Clear everything including account."""
         with self._lock:
             self.account = None
             self.plex = None

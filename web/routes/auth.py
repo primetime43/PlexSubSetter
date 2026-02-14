@@ -57,9 +57,16 @@ def poll_oauth():
         return jsonify({'status': 'error', 'error': str(e)}), 500
 
 
+@auth_bp.route('/auth/change-server', methods=['POST'])
+def change_server():
+    """Clear server connection but keep account, redirect to server selection."""
+    current_app.state.clear_server()
+    return redirect(url_for('servers.servers_page'))
+
+
 @auth_bp.route('/auth/logout', methods=['POST'])
 def logout():
-    """Clear session and redirect to login."""
+    """Clear entire session and redirect to login."""
     current_app.state.clear_auth()
     return redirect(url_for('auth.login_page'))
 

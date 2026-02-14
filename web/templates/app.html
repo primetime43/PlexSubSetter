@@ -16,9 +16,14 @@
             <button @click="showLogs = true" class="px-3 py-1.5 border border-gray-600 rounded text-sm text-gray-300 hover:bg-gray-800">
                 &#128203; Logs
             </button>
-            <form action="/auth/logout" method="post" class="inline">
+            <form action="/auth/change-server" method="post" class="inline">
                 <button type="submit" class="px-3 py-1.5 border border-gray-600 rounded text-sm text-gray-300 hover:bg-gray-800">
                     Change Server
+                </button>
+            </form>
+            <form action="/auth/logout" method="post" class="inline">
+                <button type="submit" class="px-3 py-1.5 border border-red-800 rounded text-sm text-red-400 hover:bg-red-900/30">
+                    Sign Out
                 </button>
             </form>
         </div>
