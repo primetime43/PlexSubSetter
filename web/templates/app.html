@@ -171,7 +171,7 @@
 
     <!-- Settings Modal -->
     <div x-show="showSettings" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" @keydown.escape.window="showSettings = false" @close-settings.window="showSettings = false">
-        <div class="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-2xl" @click.away="showSettings = false">
+        <div class="bg-gray-900 border border-gray-700 rounded-xl w-full max-h-[85vh] overflow-y-auto shadow-2xl" style="max-width: 800px;" @click.away="showSettings = false">
             <div class="p-6" hx-get="/settings" hx-trigger="intersect once" hx-swap="innerHTML">
                 <div class="text-center py-8 text-gray-400">Loading settings...</div>
             </div>
