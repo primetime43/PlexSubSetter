@@ -110,11 +110,11 @@ def library_items(name):
                     tm.submit('subtitle_cache', library_service.batch_check_subtitles,
                               items=remaining, state=state, task_manager=tm)
 
-    # Check if cache is complete enough for filtering
+    # Check if cache is complete (for UI status message)
     cache_complete = all(i.ratingKey in cache for i in items) if is_movie else True
 
-    # If filter is active but cache isn't ready, fall back to 'all'
-    effective_filter = subtitle_filter if cache_complete else 'all'
+    # Always apply the requested filter — uncached items are included by default
+    effective_filter = subtitle_filter
 
     result = library_service.get_items_page(
         items, page, ITEMS_PER_PAGE, search, effective_filter, state.subtitle_status_cache
