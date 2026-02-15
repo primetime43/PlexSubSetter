@@ -10,7 +10,7 @@ import logging
 import concurrent.futures
 
 from plexapi.video import Movie, Episode
-from subliminal import download_subtitles, list_subtitles
+from subliminal import list_subtitles
 from subliminal.core import ProviderPool
 from subliminal.video import Episode as SubliminalEpisode, Movie as SubliminalMovie
 from babelfish import Language
@@ -225,69 +225,84 @@ def download(items, search_results, selections, language_name, save_method, task
     logging.info(f"Download: {len(selections)} selections, {len(download_tasks)} tasks to download")
 
     if download_tasks:
-        # Batch download all subtitles in a single provider session
-        all_subs = [task[2] for task in download_tasks]
-        all_providers = list({getattr(sub, 'provider_name', 'unknown') for sub in all_subs})
-        try:
-            if task_manager:
-                task_manager.emit('log', {'message': f"Downloading {len(all_subs)} subtitle(s) (single session)..."})
-            download_subtitles(all_subs, providers=all_providers)
-        except Exception as e:
-            logging.error(f"Batch download error: {e}")
-            if task_manager:
-                task_manager.emit('log', {'message': f"Download error: {e}", 'level': 'error'})
+        # Download and save each subtitle with per-item progress
+        all_providers = list({getattr(task[2], 'provider_name', 'unknown') for task in download_tasks})
 
-        # Save each downloaded subtitle
-        for idx, (rating_key, result_data, selected_sub) in enumerate(download_tasks):
-            item = result_data['item']
-            title = result_data['title']
+        if task_manager:
+            task_manager.emit('log', {'message': f"Downloading {len(download_tasks)} subtitle(s)..."})
 
-            if task_manager:
-                task_manager.emit('progress', {
-                    'type': 'download',
-                    'current': idx + 1,
-                    'total': total_count,
-                    'item': title,
-                })
+        total_tasks = len(download_tasks)
+        with ProviderPool(providers=all_providers) as pool:
+            for idx, (rating_key, result_data, selected_sub) in enumerate(download_tasks):
+                item = result_data['item']
+                title = result_data['title']
 
-            try:
-                if not getattr(selected_sub, 'content', None):
-                    if task_manager:
-                        task_manager.emit('log', {'message': f"No content downloaded for: {title}", 'level': 'warning'})
-                    failed_items.append({'title': title, 'error': 'No content downloaded'})
-                    continue
-
-                validate_subtitle_content_size(selected_sub.content)
-
-                temp_dir = tempfile.gettempdir()
-                subtitle_filename = sanitize_subtitle_filename(item, language_code)
-                subtitle_path = os.path.join(temp_dir, subtitle_filename)
+                if task_manager:
+                    task_manager.emit('progress', {
+                        'type': 'download',
+                        'current': idx,
+                        'total': total_tasks,
+                        'item': f"Downloading: {title}",
+                    })
 
                 try:
-                    with open(subtitle_path, 'wb') as f:
-                        f.write(selected_sub.content)
+                    # Download this subtitle's content
+                    pool.download_subtitle(selected_sub)
 
-                    if save_method == 'file':
-                        _save_to_file(item, subtitle_path, language_code, task_manager)
-                    else:
-                        item.uploadSubtitles(subtitle_path)
+                    if not getattr(selected_sub, 'content', None):
+                        if task_manager:
+                            task_manager.emit('log', {'message': f"No content downloaded for: {title}", 'level': 'warning'})
+                        failed_items.append({'title': title, 'error': 'No content downloaded'})
+                        continue
 
-                    provider = getattr(selected_sub, 'provider_name', 'unknown')
+                    validate_subtitle_content_size(selected_sub.content)
+
                     if task_manager:
-                        task_manager.emit('log', {'message': f"Successfully downloaded subtitle for: {title}"})
-                    successful_keys.append(rating_key)
-                    succeeded_items.append({'title': title, 'provider': provider})
-                finally:
-                    try:
-                        os.remove(subtitle_path)
-                    except (OSError, PermissionError) as cleanup_error:
-                        logging.debug(f"Could not delete temp file: {cleanup_error}")
+                        task_manager.emit('progress', {
+                            'type': 'download',
+                            'current': idx,
+                            'total': total_tasks,
+                            'item': f"Saving: {title}",
+                        })
 
-            except Exception as e:
-                logging.error(f"Error saving subtitle for {title}: {e}")
-                failed_items.append({'title': title, 'error': str(e)})
-                if task_manager:
-                    task_manager.emit('log', {'message': f"Error saving for {title}: {e}", 'level': 'error'})
+                    temp_dir = tempfile.gettempdir()
+                    subtitle_filename = sanitize_subtitle_filename(item, language_code)
+                    subtitle_path = os.path.join(temp_dir, subtitle_filename)
+
+                    try:
+                        with open(subtitle_path, 'wb') as f:
+                            f.write(selected_sub.content)
+
+                        if save_method == 'file':
+                            _save_to_file(item, subtitle_path, language_code, task_manager)
+                        else:
+                            item.uploadSubtitles(subtitle_path)
+
+                        provider = getattr(selected_sub, 'provider_name', 'unknown')
+                        if task_manager:
+                            task_manager.emit('log', {'message': f"Successfully downloaded subtitle for: {title}"})
+                        successful_keys.append(rating_key)
+                        succeeded_items.append({'title': title, 'provider': provider})
+                    finally:
+                        try:
+                            os.remove(subtitle_path)
+                        except (OSError, PermissionError) as cleanup_error:
+                            logging.debug(f"Could not delete temp file: {cleanup_error}")
+
+                except Exception as e:
+                    logging.error(f"Error downloading/saving subtitle for {title}: {e}")
+                    failed_items.append({'title': title, 'error': str(e)})
+                    if task_manager:
+                        task_manager.emit('log', {'message': f"Error for {title}: {e}", 'level': 'error'})
+                finally:
+                    # Emit progress after each item completes (success or fail) so bar advances
+                    if task_manager:
+                        task_manager.emit('progress', {
+                            'type': 'download',
+                            'current': idx + 1,
+                            'total': total_tasks,
+                            'item': title,
+                        })
 
     # Reload successful items
     for rk in successful_keys:

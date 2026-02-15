@@ -383,7 +383,7 @@ function appState() {
 
         // SSE event handlers (called from sse.js)
         handleProgress(data) {
-            if (data.total && data.current) {
+            if (data.total > 0 && data.current != null) {
                 this.progressPercent = Math.round((data.current / data.total) * 100);
                 this.progressText = `${data.current}/${data.total}` + (data.item ? ` - ${data.item}` : '');
             }
