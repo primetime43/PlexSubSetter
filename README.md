@@ -6,6 +6,9 @@ Stop going episode by episode to set subtitles in Plex! PlexSubSetter lets you s
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
 ![License](https://img.shields.io/badge/license-GPL--3.0-orange.svg)
 
+<img width="1911" height="964" alt="image" src="https://github.com/user-attachments/assets/6564ca89-f282-4fd5-b8e3-d2bf26d03a8d" />
+<img width="1908" height="967" alt="image" src="https://github.com/user-attachments/assets/79577b03-359d-47c5-88fb-49c3c575a653" />
+
 ## Table of Contents
 - [Why I Built This](#why-i-built-this)
 - [What It Does](#what-it-does)
