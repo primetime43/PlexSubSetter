@@ -445,6 +445,8 @@ function appState() {
                 this.hasSearchResults = false;
                 subSelections = {};
                 if (data.success) {
+                    // Clear selection after successful download
+                    await this.clearSelection();
                     // Fetch and show download summary
                     try {
                         const resp = await fetch('/subtitles/download-results');
