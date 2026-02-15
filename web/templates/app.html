@@ -126,11 +126,7 @@
                             class="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed rounded px-4 py-2 text-sm font-medium">
                         &#128269; Search Available
                     </button>
-                    <button @click="listSubtitles()" :disabled="selectionCount === 0 || operationRunning"
-                            class="bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed rounded px-4 py-2 text-sm font-medium">
-                        &#128203; List Current
-                    </button>
-                    <button @click="dryRun()" :disabled="selectionCount === 0 || operationRunning"
+<button @click="dryRun()" :disabled="selectionCount === 0 || operationRunning"
                             class="bg-green-700 hover:bg-green-600 disabled:opacity-40 disabled:cursor-not-allowed rounded px-4 py-2 text-sm font-medium">
                         &#128065; Dry Run
                     </button>

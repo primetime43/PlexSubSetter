@@ -291,21 +291,6 @@ function appState() {
             }
         },
 
-        async listSubtitles() {
-            this.operationRunning = true;
-            this.progressText = 'Fetching subtitle info...';
-
-            try {
-                const resp = await fetch('/subtitles/list', { method: 'POST' });
-                const html = await resp.text();
-                document.getElementById('info-panel').innerHTML = html;
-                this.operationRunning = false;
-            } catch (e) {
-                this.operationRunning = false;
-                this._showInfoMessage('Failed to list subtitles: ' + e.message, 'error');
-            }
-        },
-
         async dryRun() {
             if (!this._confirmBatch('dry run')) return;
             this.operationRunning = true;
