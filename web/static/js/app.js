@@ -327,35 +327,6 @@ function appState() {
             }
         },
 
-        async deleteSubtitles() {
-            // Always confirm deletes regardless of threshold
-            if (!confirm(`Delete ALL subtitle streams from ${this.selectionCount} selected items?\n\nThis cannot be undone!`)) return;
-
-            this.operationRunning = true;
-            this.progressPercent = 0;
-            this.progressText = 'Deleting subtitles...';
-
-            try {
-                const resp = await fetch('/subtitles/delete', { method: 'POST' });
-                if (!resp.ok) {
-                    const err = await resp.json().catch(() => ({ error: 'Request failed' }));
-                    this._showInfoMessage(err.error || 'Delete request failed', 'error');
-                    this.operationRunning = false;
-                    return;
-                }
-                const data = await resp.json();
-                if (data.error) {
-                    this._showInfoMessage(data.error, 'error');
-                    this.operationRunning = false;
-                }
-                // Results via SSE task_complete, with polling fallback
-                if (data.task_id) this._pollTaskStatus(data.task_id);
-            } catch (e) {
-                this.operationRunning = false;
-                this._showInfoMessage('Delete failed: ' + e.message, 'error');
-            }
-        },
-
         async downloadSubtitles() {
             if (!this._confirmBatch('download')) return;
             this.operationRunning = true;
@@ -444,13 +415,6 @@ function appState() {
                     this._showInfoMessage(`Download failed: ${data.error || 'Unknown error'}`, 'error');
                 }
                 // Refresh browser items and expanded seasons to update subtitle indicators
-                this._fetchItems();
-                this._refreshExpandedSeasons();
-            } else if (data.task_type === 'subtitle_delete') {
-                this._showInfoMessage(
-                    data.success ? 'Subtitles deleted successfully.' : `Delete failed: ${data.error || 'Unknown error'}`,
-                    data.success ? 'success' : 'error'
-                );
                 this._fetchItems();
                 this._refreshExpandedSeasons();
             } else if (data.task_type === 'select_all') {

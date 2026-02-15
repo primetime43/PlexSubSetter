@@ -214,25 +214,6 @@ def list_subtitles():
         return f'<div class="text-red-400 p-4">Error: {e}</div>', 500
 
 
-@subtitles_bp.route('/subtitles/delete', methods=['POST'])
-def delete_subtitles():
-    """Start subtitle deletion (background task)."""
-    state = current_app.state
-    tm = current_app.task_manager
-
-    if not state.selected_items:
-        return jsonify({'error': 'No items selected'}), 400
-
-    items = list(state.selected_items)
-
-    def do_delete():
-        result = subtitle_service.delete(items, tm)
-        if result['successful_keys']:
-            state.clear_subtitle_cache(result['successful_keys'])
-        return result
-
-    task_id = tm.submit('subtitle_delete', do_delete)
-    return jsonify({'task_id': task_id})
 
 
 @subtitles_bp.route('/subtitles/task/<task_id>')
