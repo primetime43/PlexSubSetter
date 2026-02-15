@@ -11,6 +11,7 @@ import concurrent.futures
 
 from plexapi.video import Movie, Episode
 from subliminal import download_subtitles, list_subtitles
+from subliminal.core import ProviderPool
 from subliminal.video import Episode as SubliminalEpisode, Movie as SubliminalMovie
 from babelfish import Language
 
@@ -81,13 +82,11 @@ def search(items, language_name, providers, task_manager=None, timeout=None, sdh
     total = len(items)
 
     # Build video objects and map them back to Plex items
-    video_to_item = {}
-    videos = set()
+    video_item_pairs = []
     for item in items:
         try:
             video = _make_video_object(item)
-            video_to_item[video] = item
-            videos.add(video)
+            video_item_pairs.append((video, item))
         except Exception as e:
             title = get_item_title(item)
             logging.error(f"Error creating video object for {title}: {e}")
@@ -97,85 +96,77 @@ def search(items, language_name, providers, task_manager=None, timeout=None, sdh
                     'level': 'error',
                 })
 
-    if task_manager:
-        task_manager.emit('progress', {
-            'type': 'search',
-            'current': 0,
-            'total': total,
-            'item': f"Searching {total} items...",
-        })
-        task_manager.emit('log', {'message': f"Searching subtitles for {total} item(s) (single session)..."})
+    # Single provider session — one login/logout for all items, with per-item progress
+    pool_kwargs = {}
+    if provider_configs:
+        pool_kwargs['provider_configs'] = provider_configs
 
-    # Single batched call — one login/logout for all items
-    try:
-        kwargs = {'providers': provider_list}
-        if provider_configs:
-            kwargs['provider_configs'] = provider_configs
-        all_subtitles = list_subtitles(videos, languages={lang}, **kwargs)
-    except Exception as e:
-        logging.error(f"Error in batched subtitle search: {e}")
-        if task_manager:
-            task_manager.emit('log', {
-                'message': f"Search failed: {e}",
-                'level': 'error',
-            })
-        return results
-
-    # Process results per video
-    for video, item in video_to_item.items():
-        title = get_item_title(item)
-        subs_list = list(all_subtitles.get(video, []))
-
-        if task_manager:
-            task_manager.emit('progress', {
-                'type': 'search',
-                'current': len(results) + 1,
-                'total': total,
-                'item': title,
-            })
-
-        # Preference sort: SDH/forced subs come first if requested
-        if subs_list and (sdh or forced):
-            def _sort_key(sub):
-                score = 0
-                if sdh and getattr(sub, 'hearing_impaired', False):
-                    score -= 1
-                if forced and getattr(sub, 'forced', False):
-                    score -= 1
-                return score
-            subs_list.sort(key=_sort_key)
-
-        if subs_list:
-            results[item.ratingKey] = {
-                'title': title,
-                'item': item,
-                'subtitles_raw': subs_list,
-                'subtitles': [],
-            }
-            for i, sub in enumerate(subs_list[:MAX_SUBTITLE_RESULTS]):
-                release_info = (
-                    getattr(sub, 'movie_release_name', None) or
-                    getattr(sub, 'release', None) or
-                    getattr(sub, 'filename', None) or
-                    getattr(sub, 'info', None) or
-                    f"ID: {getattr(sub, 'subtitle_id', 'Unknown')}"
-                )
-                results[item.ratingKey]['subtitles'].append({
-                    'index': i,
-                    'provider': getattr(sub, 'provider_name', 'unknown'),
-                    'release_info': str(release_info)[:100],
-                })
+    with ProviderPool(providers=provider_list, **pool_kwargs) as pool:
+        for idx, (video, item) in enumerate(video_item_pairs):
+            title = get_item_title(item)
 
             if task_manager:
-                task_manager.emit('log', {
-                    'message': f"Found {len(subs_list)} subtitle(s) for: {title}"
+                task_manager.emit('progress', {
+                    'type': 'search',
+                    'current': idx + 1,
+                    'total': total,
+                    'item': title,
                 })
-        else:
-            if task_manager:
-                task_manager.emit('log', {
-                    'message': f"No subtitles found for: {title}",
-                    'level': 'warning',
-                })
+                task_manager.emit('log', {'message': f"Searching subtitles for: {title}"})
+
+            try:
+                subs_list = list(pool.list_subtitles(video, languages={lang}))
+            except Exception as e:
+                logging.error(f"Error searching subtitles for {title}: {e}")
+                if task_manager:
+                    task_manager.emit('log', {
+                        'message': f"Error searching for {title}: {e}",
+                        'level': 'error',
+                    })
+                continue
+
+            # Preference sort: SDH/forced subs come first if requested
+            if subs_list and (sdh or forced):
+                def _sort_key(sub):
+                    score = 0
+                    if sdh and getattr(sub, 'hearing_impaired', False):
+                        score -= 1
+                    if forced and getattr(sub, 'forced', False):
+                        score -= 1
+                    return score
+                subs_list.sort(key=_sort_key)
+
+            if subs_list:
+                results[item.ratingKey] = {
+                    'title': title,
+                    'item': item,
+                    'subtitles_raw': subs_list,
+                    'subtitles': [],
+                }
+                for i, sub in enumerate(subs_list[:MAX_SUBTITLE_RESULTS]):
+                    release_info = (
+                        getattr(sub, 'movie_release_name', None) or
+                        getattr(sub, 'release', None) or
+                        getattr(sub, 'filename', None) or
+                        getattr(sub, 'info', None) or
+                        f"ID: {getattr(sub, 'subtitle_id', 'Unknown')}"
+                    )
+                    results[item.ratingKey]['subtitles'].append({
+                        'index': i,
+                        'provider': getattr(sub, 'provider_name', 'unknown'),
+                        'release_info': str(release_info)[:100],
+                    })
+
+                if task_manager:
+                    task_manager.emit('log', {
+                        'message': f"Found {len(subs_list)} subtitle(s) for: {title}"
+                    })
+            else:
+                if task_manager:
+                    task_manager.emit('log', {
+                        'message': f"No subtitles found for: {title}",
+                        'level': 'warning',
+                    })
 
     return results
 
@@ -417,30 +408,27 @@ def dry_run(items, language_name, providers, task_manager=None, timeout=None, sd
             if task_manager:
                 task_manager.emit('log', {'message': f"Error checking {title}: {e}", 'level': 'error'})
 
-    # Second pass: batch search all items that need subtitles
+    # Second pass: search items that need subtitles (single provider session)
     if needs_search:
-        video_to_info = {}
-        videos = set()
-        for item, title in needs_search:
-            try:
-                video = _make_video_object(item)
-                video_to_info[video] = (item, title)
-                videos.add(video)
-            except Exception as e:
-                errors.append({'title': title, 'rating_key': item.ratingKey, 'error': str(e)})
+        pool_kwargs = {}
+        if provider_configs:
+            pool_kwargs['provider_configs'] = provider_configs
 
-        if videos:
-            if task_manager:
-                task_manager.emit('log', {'message': f"Searching subtitles for {len(videos)} item(s) (single session)..."})
+        with ProviderPool(providers=provider_list, **pool_kwargs) as pool:
+            for item, title in needs_search:
+                if task_manager:
+                    task_manager.emit('progress', {
+                        'type': 'dry_run',
+                        'current': len(already_have) + len(available) + len(not_available) + len(errors) + 1,
+                        'total': total,
+                        'item': title,
+                    })
 
-            try:
-                kwargs = {'providers': provider_list}
-                if provider_configs:
-                    kwargs['provider_configs'] = provider_configs
-                all_subtitles = list_subtitles(videos, languages={lang}, **kwargs)
+                try:
+                    video = _make_video_object(item)
+                    subs_list = list(pool.list_subtitles(video, languages={lang}))
+                    count = len(subs_list)
 
-                for video, (item, title) in video_to_info.items():
-                    count = len(list(all_subtitles.get(video, [])))
                     if count > 0:
                         available.append({'title': title, 'rating_key': item.ratingKey, 'count': count})
                     else:
@@ -448,12 +436,10 @@ def dry_run(items, language_name, providers, task_manager=None, timeout=None, sd
 
                     if task_manager:
                         task_manager.emit('log', {'message': f"{title}: {count} subtitle(s) available"})
-            except Exception as e:
-                logging.error(f"Error in batched subtitle search: {e}")
-                for video, (item, title) in video_to_info.items():
+                except Exception as e:
                     errors.append({'title': title, 'rating_key': item.ratingKey, 'error': str(e)})
-                if task_manager:
-                    task_manager.emit('log', {'message': f"Search failed: {e}", 'level': 'error'})
+                    if task_manager:
+                        task_manager.emit('log', {'message': f"Error checking {title}: {e}", 'level': 'error'})
 
     return {
         'already_have': already_have,
