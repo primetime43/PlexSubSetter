@@ -170,6 +170,20 @@
         </div>
     </div>
 
+    <!-- Confirm Modal -->
+    <div x-show="confirmModal.show" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+         @keydown.escape.window="confirmModal.show && _resolveConfirm(false)"
+         @click.self="_resolveConfirm(false)">
+        <div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-6 w-full max-w-md">
+            <h3 class="text-lg font-bold mb-2" x-text="confirmModal.title"></h3>
+            <p class="text-sm text-gray-300 mb-6" x-text="confirmModal.message"></p>
+            <div class="flex justify-end gap-3">
+                <button @click="_resolveConfirm(false)" class="px-4 py-2 border border-gray-600 rounded text-sm text-gray-300 hover:bg-gray-800">Cancel</button>
+                <button @click="_resolveConfirm(true)" class="px-4 py-2 rounded text-sm font-medium text-white" :class="confirmModal.confirmClass || 'bg-blue-600 hover:bg-blue-700'" x-text="confirmModal.confirmText"></button>
+            </div>
+        </div>
+    </div>
+
     <!-- Logs Panel (non-blocking, bottom-right) -->
     <div x-show="showLogs" x-cloak
          x-transition:enter="transition ease-out duration-200"

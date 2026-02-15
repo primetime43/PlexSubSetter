@@ -41,6 +41,9 @@ function appState() {
         progressText: '',
         hasSearchResults: false,
 
+        // Confirm modal state
+        confirmModal: { show: false, title: '', message: '', confirmText: 'Confirm', confirmClass: '', resolve: null },
+
         // Log refresh
         _logInterval: null,
         _logLoaded: false,
@@ -247,16 +250,33 @@ function appState() {
             }
         },
 
-        _confirmBatch(action) {
+        _showConfirm(title, message, confirmText, confirmClass) {
+            return new Promise((resolve) => {
+                this.confirmModal = { show: true, title, message, confirmText: confirmText || 'Confirm', confirmClass: confirmClass || '', resolve };
+            });
+        },
+
+        _resolveConfirm(result) {
+            const resolve = this.confirmModal.resolve;
+            this.confirmModal = { show: false, title: '', message: '', confirmText: 'Confirm', confirmClass: '', resolve: null };
+            if (resolve) resolve(result);
+        },
+
+        async _confirmBatch(action) {
             if (!window.APP_SETTINGS) return true;
             if (APP_SETTINGS.confirm_batch_operations && this.selectionCount >= APP_SETTINGS.batch_operation_threshold) {
-                return confirm(`You are about to ${action} on ${this.selectionCount} items. Continue?`);
+                return await this._showConfirm(
+                    'Confirm Batch Operation',
+                    `You are about to ${action} on ${this.selectionCount} items. Continue?`,
+                    'Continue',
+                    'bg-blue-600 hover:bg-blue-700'
+                );
             }
             return true;
         },
 
         async searchSubtitles() {
-            if (!this._confirmBatch('search')) return;
+            if (!await this._confirmBatch('search')) return;
             this.operationRunning = true;
             this.progressPercent = 0;
             this.progressText = 'Searching for subtitles...';
@@ -292,7 +312,7 @@ function appState() {
         },
 
         async dryRun() {
-            if (!this._confirmBatch('dry run')) return;
+            if (!await this._confirmBatch('dry run')) return;
             this.operationRunning = true;
             this.progressPercent = 0;
             this.progressText = 'Running dry run...';
@@ -328,7 +348,7 @@ function appState() {
         },
 
         async downloadSubtitles() {
-            if (!this._confirmBatch('download')) return;
+            if (!await this._confirmBatch('download')) return;
             this.operationRunning = true;
             this.progressPercent = 0;
             this.progressText = 'Downloading subtitles...';
