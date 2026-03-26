@@ -70,6 +70,15 @@ class SessionState:
             if item.ratingKey not in existing_keys:
                 self.selected_items.append(item)
 
+    def add_selections(self, items):
+        """Add multiple items at once, deduplicating by ratingKey (single lock)."""
+        with self._lock:
+            existing_keys = {i.ratingKey for i in self.selected_items}
+            for item in items:
+                if item.ratingKey not in existing_keys:
+                    self.selected_items.append(item)
+                    existing_keys.add(item.ratingKey)
+
     def remove_selection(self, item):
         with self._lock:
             self.selected_items = [
@@ -99,6 +108,16 @@ class SessionState:
     def get_subtitle_status(self, rating_key):
         with self._lock:
             return self.subtitle_status_cache.get(rating_key)
+
+    def get_subtitle_cache_snapshot(self):
+        """Return a shallow copy of the subtitle status cache (thread-safe)."""
+        with self._lock:
+            return dict(self.subtitle_status_cache)
+
+    def get_uncached_keys(self, items):
+        """Return items whose ratingKey is not in the subtitle cache (thread-safe)."""
+        with self._lock:
+            return [i for i in items if i.ratingKey not in self.subtitle_status_cache]
 
     def clear_subtitle_cache(self, rating_keys=None):
         with self._lock:

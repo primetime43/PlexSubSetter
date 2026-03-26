@@ -193,34 +193,36 @@ def download(items, search_results, selections, language_name, save_method, task
 
     # Build list of download tasks (skip entries with index -1 or missing data)
     download_tasks = []
+    skipped_items = []
+    failed_items = []
+    succeeded_items = []
+
     for rating_key, selected_index in selections.items():
         if selected_index == -1:
+            result_data = search_results.get(rating_key, {})
+            skipped_items.append(result_data.get('title', str(rating_key)))
             if task_manager:
-                result_data = search_results.get(rating_key, {})
                 task_manager.emit('log', {'message': f"Skipped: {result_data.get('title', rating_key)}"})
             continue
 
         result_data = search_results.get(rating_key)
         if not result_data:
             logging.warning(f"Download: no search results for rating_key={rating_key} (type={type(rating_key)}), available keys={list(search_results.keys())[:5]}")
+            failed_items.append(str(rating_key))
+            if task_manager:
+                task_manager.emit('log', {'message': f"Failed: no search results for item {rating_key}"})
             continue
 
         subs_list = result_data.get('subtitles_raw', [])
         if selected_index >= len(subs_list):
-            logging.warning(f"Download: selected_index={selected_index} >= subs count={len(subs_list)} for {result_data.get('title')}")
+            title = result_data.get('title', str(rating_key))
+            logging.warning(f"Download: selected_index={selected_index} >= subs count={len(subs_list)} for {title}")
+            failed_items.append(title)
+            if task_manager:
+                task_manager.emit('log', {'message': f"Failed: invalid subtitle selection for {title}"})
             continue
 
         download_tasks.append((rating_key, result_data, subs_list[selected_index]))
-
-    skipped_items = []
-    failed_items = []
-    succeeded_items = []
-
-    # Track skipped items
-    for rating_key, selected_index in selections.items():
-        if selected_index == -1:
-            result_data = search_results.get(rating_key, {})
-            skipped_items.append(result_data.get('title', str(rating_key)))
 
     logging.info(f"Download: {len(selections)} selections, {len(download_tasks)} tasks to download")
 

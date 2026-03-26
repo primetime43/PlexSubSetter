@@ -80,9 +80,8 @@ def library_items(name):
     is_movie = isinstance(items[0], Movie) if items else False
 
     # Subtitle cache for movies
-    cache = state.subtitle_status_cache  # direct dict ref, reads are thread-safe in CPython
     if is_movie:
-        all_uncached = [i for i in items if i.ratingKey not in cache]
+        all_uncached = state.get_uncached_keys(items)
 
         if all_uncached:
             # Synchronously check the current page's items so the first response has indicators.
@@ -94,12 +93,12 @@ def library_items(name):
                 page_candidates = [i for i in items if search_lower in i.title.lower()][start_idx:end_idx]
             else:
                 page_candidates = items[start_idx:end_idx]
-            page_uncached = [i for i in page_candidates if i.ratingKey not in cache]
+            page_uncached = state.get_uncached_keys(page_candidates)
             if page_uncached:
                 library_service.batch_check_subtitles_sync(page_uncached, state)
 
             # Background task for remaining uncached items (not on this page)
-            remaining = [i for i in items if i.ratingKey not in cache]
+            remaining = state.get_uncached_keys(items)
             if remaining:
                 tm = current_app.task_manager
                 running = any(
@@ -110,14 +109,15 @@ def library_items(name):
                     tm.submit('subtitle_cache', library_service.batch_check_subtitles,
                               items=remaining, state=state, task_manager=tm)
 
-    # Check if cache is complete (for UI status message)
+    # Check if cache is complete (for UI status message) — use snapshot for consistency
+    cache = state.get_subtitle_cache_snapshot()
     cache_complete = all(i.ratingKey in cache for i in items) if is_movie else True
 
     # Always apply the requested filter — uncached items are included by default
     effective_filter = subtitle_filter
 
     result = library_service.get_items_page(
-        items, page, ITEMS_PER_PAGE, search, effective_filter, state.subtitle_status_cache
+        items, page, ITEMS_PER_PAGE, search, effective_filter, cache
     )
 
     selected_keys = state.get_selected_keys()
@@ -135,7 +135,7 @@ def library_items(name):
                            search=search,
                            subtitle_filter=subtitle_filter,
                            effective_filter=effective_filter,
-                           subtitle_cache=state.subtitle_status_cache,
+                           subtitle_cache=cache,
                            selected_keys=selected_keys,
                            library_name=name,
                            cache_complete=cache_complete)
@@ -237,29 +237,28 @@ def add_selection():
             except Exception:
                 pass
 
+    # Collect all items to add (expanding seasons/shows into episodes)
+    to_add = []
     for key in keys:
-        if key in items_map:
-            item = items_map[key]
-        else:
+        if key not in items_map:
             continue
+        item = items_map[key]
 
-        # Expand Season/Show into individual episodes
         if isinstance(item, Season):
             try:
-                for episode in item.episodes():
-                    state.add_selection(episode)
+                to_add.extend(item.episodes())
             except Exception as e:
                 logging.error(f"Error expanding season {item.title}: {e}")
         elif isinstance(item, Show):
             try:
                 for season in item.seasons():
-                    for episode in season.episodes():
-                        state.add_selection(episode)
+                    to_add.extend(season.episodes())
             except Exception as e:
                 logging.error(f"Error expanding show {item.title}: {e}")
         else:
-            state.add_selection(item)
+            to_add.append(item)
 
+    state.add_selections(to_add)
     return jsonify({'count': len(state.selected_items)})
 
 
@@ -329,17 +328,17 @@ def add_all_selection():
 
     def do_select_all():
         if is_movie:
-            for item in items:
-                state.add_selection(item)
+            state.add_selections(items)
         else:
-            # Shows: select all episodes
+            # Shows: collect all episodes then add in one atomic operation
+            all_episodes = []
             for show in items:
                 try:
                     for season in show.seasons():
-                        for episode in season.episodes():
-                            state.add_selection(episode)
+                        all_episodes.extend(season.episodes())
                 except Exception as e:
                     logging.error(f"Error selecting episodes for {show.title}: {e}")
+            state.add_selections(all_episodes)
 
         tm.emit('status', {'message': f"Selected {len(state.selected_items)} items"})
         return {'count': len(state.selected_items)}
