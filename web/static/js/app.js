@@ -529,6 +529,11 @@ window.toggleItem = async function(checkbox) {
         if (appEl && appEl._x_dataStack) {
             Alpine.$data(appEl).selectionCount = data.count;
         }
+        // Toggle highlight on the item row
+        const row = checkbox.closest('.browser-item');
+        if (row) {
+            row.classList.toggle('bg-plex-gold/10', checkbox.checked);
+        }
     } catch (e) {
         console.error('Toggle item failed:', e);
     }
@@ -619,13 +624,20 @@ window.toggleSeasonSelect = async function(checkbox, libraryName, ratingKey) {
         if (appEl && appEl._x_dataStack) {
             Alpine.$data(appEl).selectionCount = data.count;
         }
-        // Sync episode checkboxes within this season's panel
+        // Sync episode checkboxes and highlighting within this season's panel
         const seasonDiv = checkbox.closest('[data-season-key]');
         if (seasonDiv) {
+            // Highlight the season header row
+            const seasonHeader = seasonDiv.querySelector(':scope > div');
+            if (seasonHeader) {
+                seasonHeader.classList.toggle('bg-plex-gold/10', isChecked);
+            }
             const episodeContainer = seasonDiv.querySelector('.episodes-container');
             if (episodeContainer) {
                 episodeContainer.querySelectorAll('.item-checkbox').forEach(cb => {
                     cb.checked = isChecked;
+                    const row = cb.closest('.browser-item');
+                    if (row) row.classList.toggle('bg-plex-gold/10', isChecked);
                 });
             }
         }

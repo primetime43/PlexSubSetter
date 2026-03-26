@@ -1,5 +1,5 @@
 {% for ep in episodes %}
-<div class="flex items-center gap-2 px-3 py-1 hover:bg-gray-800/40 browser-item"
+<div class="flex items-center gap-2 px-3 py-1 hover:bg-gray-800/40 browser-item {% if ep.ratingKey in selected_keys %}bg-plex-gold/10{% endif %}"
      data-key="{{ ep.ratingKey }}">
     <input type="checkbox"
            class="item-checkbox rounded border-gray-600 bg-gray-800 text-plex-gold focus:ring-plex-gold"

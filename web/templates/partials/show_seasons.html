@@ -1,12 +1,13 @@
 {% for season in seasons %}
 <div class="rounded bg-gray-800/30 mb-1" data-season-key="{{ season.ratingKey }}">
-    <div class="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-800/50 cursor-pointer">
+    <div class="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-800/50 cursor-pointer {% if season.ratingKey in fully_selected_seasons %}bg-plex-gold/10{% endif %}">
         <button class="text-gray-500 hover:text-gray-300 expand-btn"
                 onclick="window.toggleSeason(this, '{{ library_name }}', {{ season.ratingKey }})"
                 data-expanded="false"><svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M3 1l5 4-5 4V1z"/></svg></button>
         <input type="checkbox"
                class="season-checkbox rounded border-gray-600 bg-gray-800 text-plex-gold focus:ring-plex-gold"
                data-key="{{ season.ratingKey }}"
+               {% if season.ratingKey in fully_selected_seasons %}checked{% endif %}
                onchange="window.toggleSeasonSelect(this, '{{ library_name }}', {{ season.ratingKey }})">
         <span class="text-xs text-gray-300">
             Season {{ season.seasonNumber if season.seasonNumber is defined else season.index }}

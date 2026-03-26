@@ -161,12 +161,24 @@ def show_seasons(name, rating_key):
             return '<div class="text-red-400">Show not found</div>', 404
 
         seasons = library_service.get_seasons(show)
-        selected_keys = state.get_selected_keys()
+        selected_keys = set(state.get_selected_keys())
+
+        # Determine which seasons have all episodes selected
+        fully_selected_seasons = set()
+        for season in seasons:
+            try:
+                eps = library_service.get_episodes(season)
+                if eps and all(ep.ratingKey in selected_keys for ep in eps):
+                    fully_selected_seasons.add(season.ratingKey)
+            except Exception:
+                pass
+
         return render_template('partials/show_seasons.html',
                                seasons=seasons,
                                library_name=name,
                                show_key=rating_key,
-                               selected_keys=selected_keys)
+                               selected_keys=selected_keys,
+                               fully_selected_seasons=fully_selected_seasons)
     except Exception as e:
         logging.error(f"Error loading seasons: {e}")
         return f'<div class="text-red-400 p-4">Error: {e}</div>', 500

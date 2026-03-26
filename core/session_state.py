@@ -66,13 +66,16 @@ class SessionState:
 
     def add_selection(self, item):
         with self._lock:
-            if item not in self.selected_items:
+            existing_keys = {i.ratingKey for i in self.selected_items}
+            if item.ratingKey not in existing_keys:
                 self.selected_items.append(item)
 
     def remove_selection(self, item):
         with self._lock:
-            if item in self.selected_items:
-                self.selected_items.remove(item)
+            self.selected_items = [
+                i for i in self.selected_items
+                if i.ratingKey != item.ratingKey
+            ]
 
     def clear_selection(self):
         with self._lock:
